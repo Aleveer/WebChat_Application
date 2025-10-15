@@ -1,0 +1,27 @@
+services:
+  mongo:
+    image: mongo:6
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongo:27017/webchat
+      - MONGODB_DB=webchat
+    depends_on:
+      - mongo
+    ports:
+      - "3000:3000"
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+volumes:
+  mongo-data:
