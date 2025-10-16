@@ -46,5 +46,3 @@ ENV BACKEND_PORT=3000
 EXPOSE ${FRONTEND_PORT}
 
 CMD ["nginx", "-g", "daemon off;"]
-
-
