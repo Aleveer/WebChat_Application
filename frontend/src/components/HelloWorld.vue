@@ -6,17 +6,52 @@ defineProps({
 })
 
 const count = ref(0)
-const apiMessage = ref('')
+const apiHello = ref('')
+const ping = ref('')
+const apiB = ref('')
+const apiA = ref('')
+const loading = ref(false)
+const error = ref('')
+
+async function callApi(path) {
+  try {
+    error.value = ''
+    loading.value = true
+    const res = await fetch(path)
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const data = await res.json()
+      return data
+    }
+    const text = await res.text()
+    return text
+  } catch (e) {
+    error.value = 'Lỗi gọi API'
+    return null
+  } finally {
+    loading.value = false
+  }
+}
 
 onMounted(async () => {
-  try {
-    const res = await fetch('/api/hello')
-    const data = await res.json()
-    apiMessage.value = data.message ?? JSON.stringify(data)
-  } catch (e) {
-    apiMessage.value = 'Lỗi gọi API'
-  }
+  const data = await callApi('/api/hello')
+  apiHello.value = typeof data === 'string' ? data : (data?.message ?? JSON.stringify(data))
 })
+
+async function callPing() {
+  const data = await callApi('/ping')
+  ping.value = typeof data === 'string' ? data : JSON.stringify(data)
+}
+
+async function callB() {
+  const data = await callApi('/api/b')
+  apiB.value = typeof data === 'string' ? data : JSON.stringify(data)
+}
+
+async function callA() {
+  const data = await callApi('/api/a')
+  apiA.value = typeof data === 'string' ? data : JSON.stringify(data)
+}
 </script>
 
 <template>
@@ -31,7 +66,21 @@ onMounted(async () => {
   </div>
 
   <div class="card">
-    <p>Phản hồi từ backend: <strong>{{ apiMessage }}</strong></p>
+    <p>Phản hồi /api/hello: <strong>{{ apiHello }}</strong></p>
+  </div>
+
+  <div class="card">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button type="button" @click="callPing" :disabled="loading">Gọi /ping</button>
+      <button type="button" @click="callB" :disabled="loading">Gọi /api/b</button>
+      <button type="button" @click="callA" :disabled="loading">Gọi /api/a</button>
+    </div>
+    <div v-if="error" style="color: #c00; margin-top: 8px;">{{ error }}</div>
+    <div style="margin-top: 8px;">
+      <div><strong>/ping:</strong> {{ ping }}</div>
+      <div><strong>/api/b:</strong> {{ apiB }}</div>
+      <div><strong>/api/a:</strong> {{ apiA }}</div>
+    </div>
   </div>
 
   <p>

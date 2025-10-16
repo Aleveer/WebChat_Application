@@ -14,4 +14,19 @@ export class AppController {
   getApiHello() {
     return { message: this.appService.getHello() };
   }
+
+  @Get('ping')
+  ping(): string {
+    return this.appService.getPing();
+  }
+
+  @Get('api/b')
+  getB() {
+    return this.appService.getB();
+  }
+
+  @Get('api/a')
+  getA() {
+    return this.appService.getA();
+  }
 }
