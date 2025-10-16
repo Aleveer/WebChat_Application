@@ -1,58 +1,30 @@
-<template>
-  <main class="container">
-    <h1>WebChat</h1>
-    <section class="status">
-      <p>
-        API status:
-        <strong :class="{ ok: health?.status === 'ok' }">{{
-          health?.status || "..."
-        }}</strong>
-      </p>
-      <button @click="refreshHealth">Refresh</button>
-    </section>
-  </main>
-</template>
-
-<script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { getHealth } from "./services/apiClient";
-
-const health = ref<{ status: string } | null>(null);
-
-async function refreshHealth() {
-  try {
-    health.value = await getHealth();
-  } catch (err) {
-    health.value = { status: "error" };
-  }
-}
-
-onMounted(refreshHealth);
+<script setup>
+import HelloWorld from './components/HelloWorld.vue'
 </script>
 
+<template>
+  <div>
+    <a href="https://vite.dev" target="_blank">
+      <img src="/vite.svg" class="logo" alt="Vite logo" />
+    </a>
+    <a href="https://vuejs.org/" target="_blank">
+      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
+    </a>
+  </div>
+  <HelloWorld msg="Vite + Vue" />
+</template>
+
 <style scoped>
-.container {
-  max-width: 720px;
-  margin: 40px auto;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell,
-    Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
 }
-.status {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
 }
-.ok {
-  color: #16a34a;
-}
-button {
-  padding: 6px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-}
-button:hover {
-  background: #f9fafb;
+.logo.vue:hover {
+  filter: drop-shadow(0 0 2em #42b883aa);
 }
 </style>

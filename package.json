@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "mongodb-driver": "^0.1.0"
+  }
+}

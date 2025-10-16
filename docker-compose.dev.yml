@@ -1,0 +1,58 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: webchat-mongodb-dev
+    command: ["--bind_ip_all"]
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data_dev:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep 1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    container_name: webchat-backend-dev
+    build:
+      context: ./backend
+      dockerfile: dockerfile.backend
+      target: dev
+    env_file:
+      - .env.development
+    ports:
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run start:dev
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  frontend:
+    container_name: webchat-frontend-dev
+    depends_on:
+      - backend
+    build:
+      context: ./frontend
+      dockerfile: dockerfile.frontend
+      target: dev
+    env_file:
+      - .env.development
+    ports:
+      - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT}"
+
+networks:
+  default:
+    name: webchat-dev
+
+volumes:
+  mongodb_data_dev:
+

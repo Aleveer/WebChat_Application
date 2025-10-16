@@ -1,27 +1,53 @@
 services:
-  mongo:
-    image: mongo:6
-    restart: unless-stopped
+  mongodb:
+    image: mongo:7.0
+    container_name: webchat-mongodb-prod
+    command: ["--bind_ip_all"]
+    profiles:
+      - local-mongo
+    env_file:
+      - .env.production
     volumes:
-      - mongo-data:/data/db
+      - mongodb_data_prod:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --username $${MONGO_INITDB_ROOT_USERNAME} --password $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep 1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
   backend:
+    container_name: webchat-backend-prod
     build:
       context: ./backend
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - MONGODB_URI=mongodb://mongo:27017/webchat
-      - MONGODB_DB=webchat
-    depends_on:
-      - mongo
+      dockerfile: dockerfile.backend
+      target: prod
+    env_file:
+      - .env.production
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    restart: unless-stopped
+
   frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "8080:80"
+    container_name: webchat-frontend-prod
     depends_on:
       - backend
+    build:
+      context: ./frontend
+      dockerfile: dockerfile.frontend
+      target: runtime
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_SOCKET_URL=${VITE_SOCKET_URL}
+    env_file:
+      - .env.production
+    ports:
+      - "${FRONTEND_PORT:-80}:${FRONTEND_PORT:-80}"
+    restart: unless-stopped
+
+networks:
+  default:
+    name: webchat-prod
+
 volumes:
-  mongo-data:
+  mongodb_data_prod:

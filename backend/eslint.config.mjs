@@ -1,29 +1,35 @@
-import js from '@eslint/js';
+// @ts-check
+import eslint from '@eslint/js';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-    js.configs.recommended,
-    ...tseslint.configs.recommended,
-    {
-        ignores: ['dist', 'node_modules'],
+  {
+    ignores: ['eslint.config.mjs'],
+  },
+  eslint.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
+  eslintPluginPrettierRecommended,
+  {
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
+      sourceType: 'commonjs',
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
-    {
-        languageOptions: {
-            parser: tseslint.parser,
-            parserOptions: {
-                project: false,
-                ecmaVersion: 'latest',
-                sourceType: 'module',
-            },
-        },
-        plugins: {
-            '@typescript-eslint': tseslint.plugin,
-        },
-        rules: {
-            // điều chỉnh quy tắc tối thiểu cho NestJS
-            'no-console': 'off',
-        },
-    }
+  },
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      "prettier/prettier": ["error", { endOfLine: "auto" }],
+    },
+  },
 );
-
-

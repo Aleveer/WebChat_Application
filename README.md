@@ -1,158 +1,180 @@
-# WebChat_Application
+# WebChat Application – Hướng dẫn thiết lập và chạy (Dev/Prod/Docker)
 
-## Tổng quan
-Ứng dụng web chat full‑stack gồm:
-- Backend: NestJS + MongoDB (Mongoose)
-- Frontend: Vue 3 + Vite
-- Docker: Compose cho môi trường dev/prod
-- Terraform: Hạ tầng tham chiếu trên AWS
+Tài liệu này hướng dẫn cách chuẩn bị biến môi trường, build và chạy dự án ở chế độ development và production bằng Docker Compose. Tất cả lệnh mẫu đều chạy tốt trên Windows PowerShell.
 
-## Cấu trúc thư mục
+## Yêu cầu
+
+- Docker Desktop (Compose v2)
+- Node 20+ (chỉ cần nếu bạn muốn chạy trực tiếp ngoài Docker)
+
+## Cấu trúc dự án
+
+- `backend/` – API (NestJS)
+- `frontend/` – Ứng dụng Vue 3 (Vite; dùng Nginx ở runtime production)
+- `docker-compose.dev.yml` – cấu hình cho development
+- `docker-compose.prod.yml` – cấu hình cho production (có profile `local-mongo` để bật MongoDB nội bộ)
+- `.env.development`, `.env.production` – đặt tại thư mục root
+
+## Biến môi trường (mẫu)
+
+### Development – `.env.development`
+
+```bash
+# Backend
+BACKEND_PORT=3000
+# Nếu dùng MongoDB container trong compose (mặc định):
+MONGODB_PORT=27017
+MONGODB_URI=mongodb://mongodb:27017/webchat
+
+# Frontend (Vite dev server)
+FRONTEND_PORT=5173
+
+# URL phục vụ cấu hình app (dev)
+FRONTEND_URL=http://localhost:${FRONTEND_PORT}
+API_URL=http://localhost:${BACKEND_PORT}
+
+# Vite (frontend)
+VITE_API_BASE_URL=${API_URL}
+VITE_SOCKET_URL=${API_URL}
 ```
-backend/            # NestJS API
-frontend/           # Vue 3 + Vite
-infra/terraform/    # Terraform (AWS)
-scripts/            # PowerShell auto setup/run (Windows)
-```
-
-## Yêu cầu hệ thống
-- Node.js >= 18
-- Docker Desktop (có Docker Compose)
-- Windows PowerShell (để dùng script tự động)
-- (Tuỳ chọn) Terraform >= 1.6 và AWS CLI (đã cấu hình credential) khi triển khai hạ tầng
-
----
-
-## Chạy nhanh bằng PowerShell scripts (Khuyến nghị)
-
-Scripts đã tự động hoá: cài dependencies, dựng Docker Compose, chờ container sẵn sàng, in trạng thái. Chỉ cần 1 lệnh.
-
-- Dev (hot-reload frontend):
-  ```powershell
-  .\scripts\dev-run.ps1
-  ```
-  - Frontend dev: `http://localhost:5173`
-  - Backend API: `http://localhost:3000` (health: `/health`)
-
-- Prod-like (build image frontend + chạy qua Nginx):
-  ```powershell
-  .\scripts\prod-run.ps1
-  ```
-  - Frontend (Nginx): `http://localhost:8080`
-  - Backend API: `http://localhost:3000`
-
-Lưu ý:
-- Lần đầu chạy sẽ tương đối lâu vì phải tải image và cài `npm ci`.
-- Scripts sẽ tự `docker compose down` trước khi `up` để làm sạch phiên trước.
-
----
-
-## Chạy thủ công (tuỳ chọn)
-
-- Dev:
-  ```bash
-  docker compose up -d --build
-  # Frontend: http://localhost:5173
-  # Backend:  http://localhost:3000 (health: /health)
-  ```
-
-- Prod-like:
-  ```bash
-  docker compose -f docker-compose.prod.yml up -d --build
-  # Frontend (Nginx): http://localhost:8080
-  # Backend:          http://localhost:3000
-  ```
-
----
-
-## Biến môi trường (.env)
-
-Không commit file `.env`. Tự tạo theo nhu cầu. Có 2 nhóm chính:
-
-- Backend (`backend/.env`):
-  - `PORT` (mặc định 3000) — cổng API
-  - `MONGODB_URI` — ví dụ: `mongodb://mongo:27017/webchat` (khi chạy bằng Compose) hoặc `mongodb://127.0.0.1:27017/webchat` (khi chạy Mongo local)
-  - `MONGODB_DB` — ví dụ: `webchat`
-
-  Ví dụ `backend/.env`:
-  ```env
-  PORT=3000
-  MONGODB_URI=mongodb://mongo:27017/webchat
-  MONGODB_DB=webchat
-  ```
-
-- Frontend (`frontend/.env`):
-  - `VITE_API_BASE_URL` — URL Backend, ví dụ `http://localhost:3000`
-
-  Ví dụ `frontend/.env`:
-  ```env
-  VITE_API_BASE_URL=http://localhost:3000
-  ```
 
 Ghi chú:
-- Trong Docker Compose, các biến backend/frontend đã được đặt sẵn giá trị mặc định để chạy ngay. Bạn có thể chỉnh sửa trực tiếp trong `docker-compose.yml`/`docker-compose.prod.yml` hoặc thay bằng cơ chế build args/secrets tuỳ nhu cầu.
-- NestJS `ConfigModule.forRoot({ isGlobal: true })` sẽ đọc biến môi trường khi chạy trực tiếp (npm). Khi chạy bằng Docker, biến được truyền từ Compose.
-- Vite chỉ expose biến bắt đầu bằng `VITE_` sang phía client.
 
----
+- Compose dev đã bao gồm service `mongodb` và `backend` sẽ chờ MongoDB khỏe (healthcheck) trước khi khởi chạy.
+- Nếu muốn dùng MongoDB bên ngoài, cập nhật `MONGODB_URI` tương ứng, có thể bỏ export cổng `MONGODB_PORT`.
 
-## Lệnh npm hữu ích (chạy ngoài Docker)
+### Production – `.env.production`
 
-- Backend:
-  ```bash
-  cd backend
-  npm ci
-  npm run start:dev
-  ```
-
-- Frontend:
-  ```bash
-  cd frontend
-  npm ci
-  npm run dev
-  ```
-
----
-
-## Triển khai hạ tầng trên AWS (tham chiếu)
-
-Yêu cầu: Terraform >= 1.6, AWS CLI đã cấu hình credential (profile mặc định hoặc profile riêng).
+Kịch bản A (khuyến nghị) – MongoDB bên ngoài (Atlas/managed DB/host khác):
 
 ```bash
-cd infra/terraform
-terraform init
-terraform plan -out tfplan
-terraform apply tfplan
+# Backend
+BACKEND_PORT=3000
+MONGODB_URI= # điền SRV/URI từ Atlas hoặc host riêng
+
+# Frontend/Domain public
+FRONTEND_PORT=80
+FRONTEND_DOMAIN=chat.example.com
+FRONTEND_URL=http://chat.example.com
+
+# API public (đổi https nếu có TLS ở LB/ingress)
+API_URL=http://api.example.com:${BACKEND_PORT}
+
+# Vite (frontend)
+VITE_API_BASE_URL=${API_URL}
+VITE_SOCKET_URL=${API_URL}
 ```
 
-Biến Terraform (qua env hoặc `-var`):
-- `TF_VAR_aws_region` (mặc định `ap-southeast-1`)
-- `TF_VAR_project_name` (mặc định `webchat`)
-- `TF_VAR_ssh_ingress_cidr` (mặc định `0.0.0.0/0` — nên giới hạn IP của bạn)
+Kịch bản B – Chạy MongoDB trong chính docker-compose (bật profile `local-mongo`):
 
-Outputs đáng chú ý:
-- `ec2_public_ip` — IP public để SSH/truy cập dịch vụ
-- `s3_bucket_name` — bucket lưu static build frontend (nếu dùng S3/CloudFront)
-
-Triển khai ứng dụng lên EC2 (cách đơn giản):
 ```bash
-# trên EC2 sau khi cài Docker
-docker compose -f docker-compose.prod.yml up -d --build
+# Backend
+BACKEND_PORT=3000
+
+# MongoDB nội bộ (có auth)
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=change_me_strong
+MONGO_INITDB_DATABASE=webchat
+
+# Backend kết nối qua hostname 'mongodb' trong mạng compose
+MONGODB_URI=mongodb://admin:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin
+
+# Frontend/Domain public
+FRONTEND_PORT=80
+FRONTEND_DOMAIN=chat.example.com
+FRONTEND_URL=http://chat.example.com
+
+# API public
+API_URL=http://api.example.com:${BACKEND_PORT}
+
+# Vite (frontend)
+VITE_API_BASE_URL=${API_URL}
+VITE_SOCKET_URL=${API_URL}
 ```
 
-Gợi ý mở rộng sản xuất:
-- ECR cho image registry; EC2 chỉ kéo image
-- MongoDB Atlas/DocumentDB thay vì container tự quản lý
-- ALB + Auto Scaling Group thay cho 1 EC2 đơn lẻ
-- S3 + CloudFront cho frontend static
-- Route53 cho tên miền
-- AWS Secrets Manager/SSM Parameter Store để quản lý secrets
+Ghi chú prod:
 
----
+- Service `mongodb` trong `docker-compose.prod.yml` chỉ khởi chạy khi bật profile `local-mongo`.
+- Không expose 27017 ra ngoài internet. Dùng private network, VPN, hoặc SSH tunnel khi cần truy cập.
+- Nếu dùng HTTPS, đổi `FRONTEND_URL` và `API_URL` sang `https://...`.
 
-## Sức khoẻ hệ thống và bảo mật
+## Chạy Development
 
-- Endpoint kiểm tra sức khoẻ: `GET /health`
-- CORS đang mở `*` trong dev; nên giới hạn origin ở môi trường sản xuất nếu cần
-- Không commit `.env`, credentials, Terraform state
-- Hạn chế `ssh_ingress_cidr` về IP cá nhân khi triển khai
+### Khởi động (foreground)
+
+```powershell
+docker compose --env-file .env.development -f docker-compose.dev.yml up --build
+```
+
+### Khởi động (background)
+
+```powershell
+docker compose --env-file .env.development -f docker-compose.dev.yml up -d --build
+```
+
+### Truy cập
+
+- Frontend: `http://localhost:${FRONTEND_PORT}`
+- Backend (NestJS): `http://localhost:${BACKEND_PORT}`
+
+### Dừng & dọn
+
+```powershell
+docker compose -f docker-compose.dev.yml down -v --remove-orphans
+```
+
+## Chạy Production (local/AWS EC2/ECS)
+
+### Kịch bản A – Dùng MongoDB bên ngoài
+
+```powershell
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+### Kịch bản B – Bật MongoDB nội bộ (profile `local-mongo`)
+
+```powershell
+docker compose --env-file .env.production -f docker-compose.prod.yml --profile local-mongo up -d --build
+```
+
+### Kiểm tra logs
+
+```powershell
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml logs -f frontend
+```
+
+## Lệnh hữu ích
+
+### Xem trạng thái
+
+```powershell
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.prod.yml ps
+```
+
+### Vào shell MongoDB trong container
+
+```powershell
+docker exec -it webchat-mongodb-dev mongosh
+docker exec -it webchat-mongodb-prod mongosh -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin
+```
+
+### Dọn dẹp Docker
+
+```powershell
+docker compose -f docker-compose.dev.yml down -v --remove-orphans
+docker compose -f docker-compose.prod.yml down -v --remove-orphans
+docker system prune -a --volumes -f
+```
+
+## Troubleshooting nhanh
+
+- **ECONNREFUSED/ETIMEDOUT đến MongoDB**: kiểm tra `ps`, healthcheck `healthy`, đúng `MONGODB_URI`, và network/security group.
+- **Cổng bận**: đổi `BACKEND_PORT`/`FRONTEND_PORT` trong file `.env.*` tương ứng.
+
+## Ghi chú bổ sung
+
+- Backend đọc biến `BACKEND_PORT` (mặc định 3000) theo `backend/src/main.ts`.
+- Frontend Vite sử dụng biến `VITE_*` lúc build/chạy.
+- Ở production, image frontend được build với `VITE_API_BASE_URL`/`VITE_SOCKET_URL` qua build args và chạy bằng Nginx.
