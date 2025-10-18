@@ -1,0 +1,244 @@
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Request } from 'express';
+import '../types/express.d';
+
+// Get current user from request
+export const CurrentUser = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): Express.Request['user'] => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return request.user;
+  },
+);
+
+// Get user ID from request
+export const CurrentUserId = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string | undefined => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    const user = request.user;
+    if (!user) return undefined;
+    return user.id || user._id;
+  },
+);
+
+// Get IP address from request
+export const ClientIP = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return (
+      request.ip ||
+      request.connection?.remoteAddress ||
+      request.socket?.remoteAddress ||
+      'unknown'
+    );
+  },
+);
+
+// Get User Agent from request
+export const UserAgent = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return request.get('User-Agent') || '';
+  },
+);
+
+// Get pagination parameters
+export const Pagination = createParamDecorator(
+  (
+    data: unknown,
+    ctx: ExecutionContext,
+  ): {
+    page: number;
+    limit: number;
+    sortBy?: string;
+    sortOrder: 'asc' | 'desc';
+  } => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    const page = parseInt(request.query.page as string) || 1;
+    const limit = parseInt(request.query.limit as string) || 20;
+    const sortBy = request.query.sortBy as string;
+    const sortOrder = (request.query.sortOrder as 'asc' | 'desc') || 'desc';
+
+    return {
+      page: Math.max(1, page),
+      limit: Math.min(100, Math.max(1, limit)),
+      sortBy,
+      sortOrder,
+    };
+  },
+);
+
+// Get search query
+export const SearchQuery = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string | undefined => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return request.query.q as string;
+  },
+);
+
+// Get request ID for tracing
+export const RequestId = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return (
+      (request.headers['x-request-id'] as string) ||
+      (request.headers['x-correlation-id'] as string) ||
+      'unknown'
+    );
+  },
+);
+
+// Get language from request headers
+export const Language = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return (request.headers['accept-language'] as string) || 'en';
+  },
+);
+
+// Get timezone from request headers
+export const Timezone = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): string => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return (request.headers['x-timezone'] as string) || 'UTC';
+  },
+);
+
+// Custom decorator for roles
+export const Roles = (...roles: string[]) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('roles', roles, descriptor.value as object);
+    return descriptor;
+  };
+};
+
+// Custom decorator for permissions
+export const Permissions = (...permissions: string[]) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata(
+      'permissions',
+      permissions,
+      descriptor.value as object,
+    );
+    return descriptor;
+  };
+};
+
+// Custom decorator for public routes (skip auth)
+export const Public = () => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('isPublic', true, descriptor.value as object);
+    return descriptor;
+  };
+};
+
+// Custom decorator for rate limiting
+export const RateLimit = (limit: number, windowMs: number) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata(
+      'rateLimit',
+      { limit, windowMs },
+      descriptor.value as object,
+    );
+    return descriptor;
+  };
+};
+
+// Custom decorator for caching
+export const Cache = (ttl: number, key?: string) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('cache', { ttl, key }, descriptor.value as object);
+    return descriptor;
+  };
+};
+
+// Custom decorator for validation groups
+export const ValidationGroups = (...groups: string[]) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata(
+      'validationGroups',
+      groups,
+      descriptor.value as object,
+    );
+    return descriptor;
+  };
+};
+
+// Custom decorator for API versioning
+export const ApiVersion = (version: string) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('apiVersion', version, descriptor.value as object);
+    return descriptor;
+  };
+};
+
+// Custom decorator for deprecated endpoints
+export const Deprecated = (message?: string) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata(
+      'deprecated',
+      { message },
+      descriptor.value as object,
+    );
+    return descriptor;
+  };
+};
+
+// Custom decorator for API documentation
+export const ApiDescription = (description: string) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata(
+      'apiDescription',
+      description,
+      descriptor.value as object,
+    );
+    return descriptor;
+  };
+};
+
+// Custom decorator for response examples
+export const ApiExample = (example: any) => {
+  return (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('apiExample', example, descriptor.value as object);
+    return descriptor;
+  };
+};
