@@ -2,6 +2,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 import '../types/express.d';
 
+//TODO: Write test-cases for decorators file
 // Get current user from request
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): Express.Request['user'] => {

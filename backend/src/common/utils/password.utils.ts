@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 
 export class PasswordUtils {
   /**
@@ -36,5 +37,48 @@ export class PasswordUtils {
   static verifyPassword(password: string, hash: string, salt: string): boolean {
     const hashedPassword = this.hashPassword(password, salt);
     return hashedPassword === hash;
+  }
+
+  /**
+   * So sánh password với hash
+   */
+  static async comparePassword(
+    password: string,
+    hash: string,
+  ): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+
+  /**
+   * Kiểm tra độ mạnh của password
+   */
+  static validatePasswordStrength(password: string): {
+    isValid: boolean;
+    score: number;
+    feedback: string[];
+  } {
+    const feedback: string[] = [];
+    let score = 0;
+
+    if (password.length >= 8) score += 1;
+    else feedback.push('Password should be at least 8 characters long');
+
+    if (/[a-z]/.test(password)) score += 1;
+    else feedback.push('Password should contain lowercase letters');
+
+    if (/[A-Z]/.test(password)) score += 1;
+    else feedback.push('Password should contain uppercase letters');
+
+    if (/[0-9]/.test(password)) score += 1;
+    else feedback.push('Password should contain numbers');
+
+    if (/[^a-zA-Z0-9]/.test(password)) score += 1;
+    else feedback.push('Password should contain special characters');
+
+    return {
+      isValid: score >= 3,
+      score,
+      feedback,
+    };
   }
 }
