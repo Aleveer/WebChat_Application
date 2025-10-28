@@ -1,0 +1,56 @@
+/**
+ * Centralized Error Codes
+ * Prevents duplicate error code definitions across filters
+ */
+export const ERROR_CODES = {
+  // HTTP Error Codes
+  BAD_REQUEST: 'BAD_REQUEST',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // Database Error Codes
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  DUPLICATE_ENTRY: 'DUPLICATE_ENTRY',
+  DATABASE_VALIDATION_ERROR: 'DATABASE_VALIDATION_ERROR',
+
+  // Business Logic Error Codes
+  BUSINESS_ERROR: 'BUSINESS_ERROR',
+
+  // Authentication Error Codes
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+
+  // Unknown Error
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+/**
+ * HTTP Status to Error Code Mapping
+ */
+export const HTTP_STATUS_TO_ERROR_CODE: Record<number, ErrorCode> = {
+  400: ERROR_CODES.BAD_REQUEST,
+  401: ERROR_CODES.UNAUTHORIZED,
+  403: ERROR_CODES.FORBIDDEN,
+  404: ERROR_CODES.NOT_FOUND,
+  409: ERROR_CODES.CONFLICT,
+  422: ERROR_CODES.VALIDATION_ERROR,
+  429: ERROR_CODES.RATE_LIMIT_EXCEEDED,
+  408: ERROR_CODES.REQUEST_TIMEOUT,
+  500: ERROR_CODES.INTERNAL_ERROR,
+};
+
+/**
+ * Get error code from HTTP status
+ */
+export function getErrorCodeFromStatus(status: number): ErrorCode {
+  return HTTP_STATUS_TO_ERROR_CODE[status] || ERROR_CODES.UNKNOWN_ERROR;
+}

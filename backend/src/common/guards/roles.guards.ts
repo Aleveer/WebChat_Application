@@ -6,6 +6,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ForbiddenException } from '@nestjs/common';
 
 // Roles Guard
+//TODO: Implement roles check properly
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
@@ -27,7 +28,8 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    const userWithRole = user as unknown as { role?: string };
+    const hasRole = requiredRoles.some((role) => userWithRole.role === role);
     if (!hasRole) {
       throw new ForbiddenException('Insufficient permissions');
     }

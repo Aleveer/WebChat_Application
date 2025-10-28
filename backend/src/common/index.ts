@@ -2,6 +2,14 @@
 
 // Constants
 export * from './constants/app.constants';
+export * from './constants/error-codes.constants';
+
+// Configuration
+export * from './config/common-module.config';
+export * from './config/interceptor.config';
+
+// Interfaces
+export * from './interfaces';
 
 // DTOs
 export * from './dto/api.response.dto';
@@ -10,7 +18,6 @@ export * from './dto/bulkaction.dto';
 export * from './dto/error.response.dto';
 export * from './dto/paginated.response.dto';
 export * from './dto/pagination.dto';
-export * from './dto/queryparams.dto';
 export * from './dto/search.dto';
 export * from './dto/success.response.dto';
 export * from './dto/validation.error.dto';
@@ -32,13 +39,16 @@ export * from './guards/throttle.guards';
 
 // Interceptors
 export * from './interceptors/cache.interceptors';
-export * from './interceptors/compression.interceptors';
 export * from './interceptors/logging.interceptors';
 export * from './interceptors/performance.interceptors';
-export * from './interceptors/ratelimit.interceptors';
-export * from './interceptors/request.id.interceptors';
+export {
+  RequestIdInterceptor,
+  getCurrentRequestId,
+  getCurrentUserId,
+  getRequestContext,
+  requestContext,
+} from './interceptors/request.id.interceptors';
 export * from './interceptors/response.transform.interceptors';
-export * from './interceptors/security.headers.interceptors';
 export * from './interceptors/timeout.interceptors';
 export * from './interceptors/sanitization.interceptors';
 
@@ -50,6 +60,7 @@ export * from './filters/http.exception.filters';
 export * from './filters/ratelimit.exception.filters';
 export * from './filters/timeout.exception.filters';
 export * from './filters/validationexception.filters';
+export * from './filters/base.exception.filters';
 
 // Services
 export * from './services/analytic.services';
@@ -68,7 +79,14 @@ export * from './utils/password.utils';
 export * from './utils/response.utils';
 export * from './utils/string.utils';
 export * from './utils/validation.utils';
+export * from './utils/error-response.formatter';
+export * from './utils/circuit-breaker';
+
+// Module
+export { CommonModule } from './common.module';
+
+// Types
+export * from './types';
 
 // Re-export commonly used types
-export type { Request, Response } from 'express';
 export type { Observable } from 'rxjs';

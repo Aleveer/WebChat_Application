@@ -22,12 +22,21 @@ export class MessageOwnerGuard implements CanActivate {
     // Here you would check if user is the owner of the message
     // This is a simplified version
     //TODO: Implement message owner check properly
-    const message = (request as any).message; // Assuming message is attached to request
+    const requestWithMessage = request as unknown as {
+      message?: { sender_id: { toString: () => string } };
+    };
+    const message = requestWithMessage.message;
+
     if (!message) {
       throw new ForbiddenException('Message not found');
     }
 
-    const isOwner = message.sender_id.toString() === user.id;
+    const userWithId = user as unknown as {
+      id?: string;
+      _id?: { toString: () => string };
+    };
+    const userId = userWithId.id || userWithId._id?.toString();
+    const isOwner = message.sender_id.toString() === userId;
     if (!isOwner) {
       throw new ForbiddenException(
         'You can only perform this action on your own messages',

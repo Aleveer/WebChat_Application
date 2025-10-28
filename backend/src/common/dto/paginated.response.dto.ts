@@ -20,9 +20,9 @@ export class PaginatedResponseDto<T> extends BaseResponseDto<T[]> {
       hasNext: boolean;
       hasPrev: boolean;
     },
-    message?: string,
+    message: string = 'Data retrieved successfully',
   ) {
-    super(true, data, message);
+    super(true, message, data);
     this.pagination = pagination;
   }
 }

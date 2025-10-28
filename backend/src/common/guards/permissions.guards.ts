@@ -6,6 +6,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ForbiddenException } from '@nestjs/common';
 
 // Permissions Guard
+//TODO: Implement permissions check properly
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
@@ -27,7 +28,8 @@ export class PermissionsGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const userPermissions = user.permissions || [];
+    const userWithPermissions = user as unknown as { permissions?: string[] };
+    const userPermissions = userWithPermissions.permissions || [];
     const hasPermission = requiredPermissions.some((permission) =>
       userPermissions.includes(permission),
     );

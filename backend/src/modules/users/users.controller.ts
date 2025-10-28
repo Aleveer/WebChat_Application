@@ -13,11 +13,16 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, LoginDto } from './dto/create-users.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { Public } from '../../common/decorators/custom.decorators';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RateLimitGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Public()
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createUserDto: CreateUserDto) {
@@ -92,6 +97,7 @@ export class UsersController {
     };
   }
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {

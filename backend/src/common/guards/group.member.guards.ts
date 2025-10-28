@@ -22,7 +22,8 @@ export class GroupMemberGuard implements CanActivate {
     // Here you would check if user is a member of the group
     // This is a simplified version
     //TODO: Implement group member check properly
-    const userGroups = user.groups || [];
+    const userWithGroups = user as unknown as { groups?: string[] };
+    const userGroups = userWithGroups.groups || [];
     const isMember = userGroups.includes(groupId);
 
     if (!isMember) {

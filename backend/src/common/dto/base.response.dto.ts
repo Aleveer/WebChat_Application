@@ -1,24 +1,49 @@
-// Base Response DTO
-export class BaseResponseDto<T = any> {
+export class BaseResponseDto<T> {
   success: boolean;
-  message?: string;
+  message: string;
   data?: T;
-  error?: string;
+  error?: {
+    code: string;
+    details?: unknown;
+  };
   timestamp: string;
+  requestId?: string;
 
-  constructor(success: boolean, data?: T, message?: string, error?: string) {
+  constructor(
+    success: boolean,
+    message: string,
+    data?: T,
+    error?: { code: string; details?: unknown },
+    requestId?: string,
+  ) {
     this.success = success;
-    this.data = data;
     this.message = message;
+    this.data = data;
     this.error = error;
     this.timestamp = new Date().toISOString();
+    this.requestId = requestId;
   }
 
-  static success<T>(data?: T, message?: string): BaseResponseDto<T> {
-    return new BaseResponseDto(true, data, message);
+  static success<T>(
+    data: T,
+    message: string = 'Operation successful',
+    requestId?: string,
+  ): BaseResponseDto<T> {
+    return new BaseResponseDto(true, message, data, undefined, requestId);
   }
 
-  static error(error: string, message?: string): BaseResponseDto {
-    return new BaseResponseDto(false, undefined, message, error);
+  static error(
+    message: string,
+    code: string = 'ERROR',
+    details?: unknown,
+    requestId?: string,
+  ): BaseResponseDto<undefined> {
+    return new BaseResponseDto(
+      false,
+      message,
+      undefined,
+      { code, details },
+      requestId,
+    );
   }
 }

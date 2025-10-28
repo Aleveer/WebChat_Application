@@ -81,7 +81,7 @@ export class MessagesService {
   ): Promise<Message[]> {
     const { receiver_id, receiver_type, before, limit = 50 } = getMessagesDto;
 
-    let query: any = {
+    const query: Record<string, unknown> = {
       receiver_type,
       receiver_id: new Types.ObjectId(receiver_id),
     };
@@ -177,7 +177,15 @@ export class MessagesService {
     return messages;
   }
 
-  async getRecentConversations(userId: string): Promise<any[]> {
+  async getRecentConversations(userId: string): Promise<
+    Array<{
+      conversation_id: string;
+      receiver_id: string;
+      receiver_type: string;
+      last_message: unknown;
+      unread_count: number;
+    }>
+  > {
     // Get recent direct messages
     const directMessages = await this.messageModel.aggregate([
       {
@@ -243,7 +251,12 @@ export class MessagesService {
 
     // Get recent group messages
     const userGroups = await this.groupsService.findByUserId(userId);
-    const groupIds = userGroups.map((group) => (group as any)._id);
+    const groupIds = userGroups
+      .map((group) => {
+        const groupDoc = group as unknown as { _id?: Types.ObjectId };
+        return groupDoc._id?.toString() || '';
+      })
+      .filter(Boolean);
 
     const groupMessages = await this.messageModel.aggregate([
       {
@@ -284,10 +297,7 @@ export class MessagesService {
       },
     ]);
 
-    return {
-      directMessages,
-      groupMessages,
-    } as any;
+    return [...directMessages, ...groupMessages];
   }
 
   async deleteMessage(messageId: string, userId: string): Promise<void> {

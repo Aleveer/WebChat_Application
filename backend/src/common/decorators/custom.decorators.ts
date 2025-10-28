@@ -1,5 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
+import { APP_CONSTANTS } from '../constants/app.constants';
 import '../types/express.d';
 
 //TODO: Write test-cases for decorators file
@@ -11,13 +12,32 @@ export const CurrentUser = createParamDecorator(
   },
 );
 
+// Define consistent User type based on express.d.ts
+interface UserDocument {
+  id?: string;
+  _id?: { toString: () => string } | string;
+  email?: string;
+  username?: string;
+  roles?: string[];
+}
+
 // Get user ID from request
 export const CurrentUserId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): string | undefined => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    const user = request.user;
+    const user = request.user as UserDocument | undefined;
+    
     if (!user) return undefined;
-    return user.id || user._id;
+
+    // Handle both MongoDB ObjectId and string ID
+    if (user.id) return user.id;
+    if (user._id) {
+      return typeof user._id === 'string' 
+        ? user._id 
+        : user._id.toString();
+    }
+    
+    return undefined;
   },
 );
 
@@ -45,7 +65,7 @@ export const UserAgent = createParamDecorator(
 // Get pagination parameters
 export const Pagination = createParamDecorator(
   (
-    data: unknown,
+    data: string[] | undefined, // Pass allowed sort fields as parameter
     ctx: ExecutionContext,
   ): {
     page: number;
@@ -54,15 +74,33 @@ export const Pagination = createParamDecorator(
     sortOrder: 'asc' | 'desc';
   } => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    const page = parseInt(request.query.page as string) || 1;
-    const limit = parseInt(request.query.limit as string) || 20;
+    const page = parseInt(request.query.page as string) || APP_CONSTANTS.PAGINATION.DEFAULT_PAGE;
+    const limit = parseInt(request.query.limit as string) || APP_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const sortBy = request.query.sortBy as string;
     const sortOrder = (request.query.sortOrder as 'asc' | 'desc') || 'desc';
 
+    // Use provided allowed fields or default set
+    const allowedSortFields = data || [
+      'created_at',
+      'updated_at',
+      'createdAt',
+      'updatedAt',
+      'name',
+      'email',
+      'fullname',
+    ];
+    
+    const validatedSortBy = sortBy && allowedSortFields.includes(sortBy)
+      ? sortBy
+      : 'created_at';
+
     return {
-      page: Math.max(1, page),
-      limit: Math.min(100, Math.max(1, limit)),
-      sortBy,
+      page: Math.max(APP_CONSTANTS.PAGINATION.DEFAULT_PAGE, page),
+      limit: Math.min(
+        APP_CONSTANTS.PAGINATION.MAX_LIMIT,
+        Math.max(APP_CONSTANTS.PAGINATION.MIN_LIMIT, limit),
+      ),
+      sortBy: validatedSortBy,
       sortOrder,
     };
   },
@@ -107,11 +145,11 @@ export const Timezone = createParamDecorator(
 // Custom decorator for roles
 export const Roles = (...roles: string[]) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata('roles', roles, descriptor.value as object);
+    Reflect.defineMetadata('roles', roles, descriptor.value);
     return descriptor;
   };
 };
@@ -119,15 +157,11 @@ export const Roles = (...roles: string[]) => {
 // Custom decorator for permissions
 export const Permissions = (...permissions: string[]) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata(
-      'permissions',
-      permissions,
-      descriptor.value as object,
-    );
+    Reflect.defineMetadata('permissions', permissions, descriptor.value);
     return descriptor;
   };
 };
@@ -135,11 +169,11 @@ export const Permissions = (...permissions: string[]) => {
 // Custom decorator for public routes (skip auth)
 export const Public = () => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata('isPublic', true, descriptor.value as object);
+    Reflect.defineMetadata('isPublic', true, descriptor.value);
     return descriptor;
   };
 };
@@ -147,15 +181,11 @@ export const Public = () => {
 // Custom decorator for rate limiting
 export const RateLimit = (limit: number, windowMs: number) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata(
-      'rateLimit',
-      { limit, windowMs },
-      descriptor.value as object,
-    );
+    Reflect.defineMetadata('rateLimit', { limit, windowMs }, descriptor.value);
     return descriptor;
   };
 };
@@ -163,11 +193,11 @@ export const RateLimit = (limit: number, windowMs: number) => {
 // Custom decorator for caching
 export const Cache = (ttl: number, key?: string) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata('cache', { ttl, key }, descriptor.value as object);
+    Reflect.defineMetadata('cache', { ttl, key }, descriptor.value);
     return descriptor;
   };
 };
@@ -175,15 +205,11 @@ export const Cache = (ttl: number, key?: string) => {
 // Custom decorator for validation groups
 export const ValidationGroups = (...groups: string[]) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata(
-      'validationGroups',
-      groups,
-      descriptor.value as object,
-    );
+    Reflect.defineMetadata('validationGroups', groups, descriptor.value);
     return descriptor;
   };
 };
@@ -191,11 +217,11 @@ export const ValidationGroups = (...groups: string[]) => {
 // Custom decorator for API versioning
 export const ApiVersion = (version: string) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata('apiVersion', version, descriptor.value as object);
+    Reflect.defineMetadata('apiVersion', version, descriptor.value);
     return descriptor;
   };
 };
@@ -203,43 +229,51 @@ export const ApiVersion = (version: string) => {
 // Custom decorator for deprecated endpoints
 export const Deprecated = (message?: string) => {
   return (
-    target: any,
+    target: object,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    Reflect.defineMetadata('deprecated', { message }, descriptor.value);
+    return descriptor;
+  };
+};
+
+// Custom decorator for file upload
+export const FileUpload = (fieldName: string, maxSize?: number) => {
+  return (
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
     Reflect.defineMetadata(
-      'deprecated',
-      { message },
-      descriptor.value as object,
+      'fileUpload',
+      { fieldName, maxSize },
+      descriptor.value,
     );
     return descriptor;
   };
 };
 
-// Custom decorator for API documentation
-export const ApiDescription = (description: string) => {
+// Custom decorator for API response transformation
+export const TransformResponse = (transformer: (data: unknown) => unknown) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata(
-      'apiDescription',
-      description,
-      descriptor.value as object,
-    );
+    Reflect.defineMetadata('transformResponse', transformer, descriptor.value);
     return descriptor;
   };
 };
 
 // Custom decorator for response examples
-export const ApiExample = (example: any) => {
+export const ApiExample = (example: unknown) => {
   return (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor,
   ): PropertyDescriptor => {
-    Reflect.defineMetadata('apiExample', example, descriptor.value as object);
+    Reflect.defineMetadata('apiExample', example, descriptor.value);
     return descriptor;
   };
 };

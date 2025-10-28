@@ -1,11 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import { APP_CONSTANTS } from '../../../common/constants/app.constants';
 export type UserDocument = User & Document;
 
 @Schema({ timestamps: true })
 export class User {
+  id?: string;
   @Prop({
     required: true,
     unique: true,
@@ -16,7 +17,7 @@ export class User {
   phone_number: string;
 
   @Prop({ required: true, trim: true, maxlength: 100 })
-  fullname: string;
+  full_name: string;
 
   @Prop({
     required: false,
@@ -63,6 +64,11 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Add virtual id field
+UserSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
 
 // Ensure virtual fields are serialized
 UserSchema.set('toJSON', {

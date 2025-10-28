@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Request } from 'express';
-import { UnauthorizedException } from '@nestjs/common';
-import { ForbiddenException } from '@nestjs/common';
+import { Types } from 'mongoose';
+
 // Group Admin Guard
 @Injectable()
 export class GroupAdminGuard implements CanActivate {
@@ -19,10 +24,15 @@ export class GroupAdminGuard implements CanActivate {
       throw new ForbiddenException('Group ID is required');
     }
 
-    // Here you would check if user is an admin of the group
-    // This is a simplified version
-    //TODO: Implement group admin check properly
-    const userAdminGroups = user.adminGroups || [];
+    // Validate ObjectId
+    if (!Types.ObjectId.isValid(groupId)) {
+      throw new ForbiddenException('Invalid Group ID');
+    }
+
+    // TODO: Implement actual group admin check with database
+    // For now, check if user has adminGroups array
+    const userWithAdminGroups = user as unknown as { adminGroups?: string[] };
+    const userAdminGroups = userWithAdminGroups.adminGroups || [];
     const isAdmin = userAdminGroups.includes(groupId);
 
     if (!isAdmin) {

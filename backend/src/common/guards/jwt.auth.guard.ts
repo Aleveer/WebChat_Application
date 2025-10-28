@@ -1,15 +1,23 @@
-import { Injectable } from '@nestjs/common';
-import { CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 
 // JWT Auth Guard
+//TODO: Implement JWT validation properly
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private jwtService: JwtService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
       context.getHandler(),
       context.getClass(),
@@ -26,9 +34,13 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('JWT token not found');
     }
 
-    // Here you would verify the JWT token
-    // For now, we'll assume the token is valid if it exists
-    //TODO: Implement JWT token verification
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      request['user'] = payload;
+    } catch {
+      throw new UnauthorizedException('Invalid JWT token');
+    }
+
     return true;
   }
 

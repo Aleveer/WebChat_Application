@@ -1,14 +1,31 @@
 import { ValidationErrorDto } from './validation.error.dto';
+import { ApiProperty } from '@nestjs/swagger';
+
 // API Response DTO for consistent responses
-export class ApiResponseDto<T = any> {
+export class ApiResponseDto<T = unknown> {
+  @ApiProperty()
   success: boolean;
+
+  @ApiProperty({ required: false })
   message?: string;
+
+  @ApiProperty({ required: false })
   data?: T;
+
+  @ApiProperty({ required: false, type: [ValidationErrorDto] })
   errors?: ValidationErrorDto[];
+
+  @ApiProperty({ required: false })
   meta?: {
     timestamp: string;
     requestId?: string;
     version?: string;
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   };
 
   constructor(
@@ -16,7 +33,17 @@ export class ApiResponseDto<T = any> {
     data?: T,
     message?: string,
     errors?: ValidationErrorDto[],
-    meta?: { timestamp: string; requestId?: string; version?: string },
+    meta?: {
+      timestamp: string;
+      requestId?: string;
+      version?: string;
+      pagination?: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    },
   ) {
     this.success = success;
     this.data = data;

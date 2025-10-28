@@ -6,12 +6,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { throwError } from 'rxjs';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 // Data Sanitization Interceptor
 @Injectable()
 export class SanitizationInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(SanitizationInterceptor.name);
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
 
@@ -40,15 +41,50 @@ export class SanitizationInterceptor implements NestInterceptor {
     const sanitized: any = {};
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'string') {
-        // Remove potentially dangerous characters
-        sanitized[key] = value.replace(
-          /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-          '',
-        );
+        // Comprehensive XSS sanitization
+        sanitized[key] = this.sanitizeString(value);
       } else {
         sanitized[key] = this.sanitizeObject(value);
       }
     }
+
+    return sanitized;
+  }
+
+  private sanitizeString(input: string): string {
+    let sanitized = input.trim();
+
+    // Remove all HTML tags and their content
+    sanitized = sanitized
+      // Remove script tags and content
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      // Remove style tags and content
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      // Remove iframe tags
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      // Remove object tags
+      .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+      // Remove embed tags
+      .replace(/<embed\b[^>]*>/gi, '')
+      // Remove all event handlers (onclick, onerror, onload, etc.)
+      .replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '')
+      // Remove javascript: protocol
+      .replace(/javascript:/gi, '')
+      // Remove vbscript: protocol
+      .replace(/vbscript:/gi, '')
+      // Remove data: protocol (can be used for XSS)
+      .replace(/data:text\/html/gi, '')
+      // Remove expression() (IE specific)
+      .replace(/expression\s*\(/gi, '')
+      // Remove import statements
+      .replace(/@import/gi, '')
+      // Remove dangerous HTML entities
+      .replace(/&lt;script/gi, '')
+      .replace(/&lt;iframe/gi, '')
+      // Remove any remaining < > to prevent HTML injection
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
 
     return sanitized;
   }

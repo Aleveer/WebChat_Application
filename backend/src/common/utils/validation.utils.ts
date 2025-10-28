@@ -1,17 +1,13 @@
 import { Types } from 'mongoose';
-import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
 import { APP_CONSTANTS } from '../constants/app.constants';
-// Validation Utilities
+
 export class ValidationUtils {
   static isValidObjectId(id: string): boolean {
     return Types.ObjectId.isValid(id);
   }
 
   static isValidPhoneNumber(phoneNumber: string): boolean {
-    //Call app.constants.ts from src/common/constants/app.constants.ts
     const phoneRegex = APP_CONSTANTS.USERS.PHONE_REGEX;
-
     return phoneRegex.test(phoneNumber);
   }
 
@@ -41,7 +37,11 @@ export class ValidationUtils {
   }
 
   static isValidPassword(password: string): boolean {
-    return APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH < 6;
+    return (
+      password.length >= APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH &&
+      password.length <= APP_CONSTANTS.USERS.MAX_PASSWORD_LENGTH &&
+      APP_CONSTANTS.USERS.PASSWORD_REGEX.test(password)
+    );
   }
 
   static isValidName(name: string): boolean {

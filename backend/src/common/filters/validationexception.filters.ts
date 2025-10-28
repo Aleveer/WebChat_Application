@@ -1,50 +1,50 @@
 import {
   Catch,
-  ExceptionFilter,
   ArgumentsHost,
-  Logger,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { BaseExceptionFilter } from './base.exception.filters';
+import { ValidationErrorDto } from '../dto/validation.error.dto';
 
-@Catch()
-export class ValidationExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(ValidationExceptionFilter.name);
-
-  catch(exception: any, host: ArgumentsHost) {
+@Catch(BadRequestException)
+export class ValidationExceptionFilter extends BaseExceptionFilter {
+  catch(exception: BadRequestException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    let status = HttpStatus.BAD_REQUEST;
+    const exceptionResponse = exception.getResponse();
     let message = 'Validation failed';
-    let errors: any[] = [];
+    let errors: ValidationErrorDto[] = [];
 
-    if (exception.response && Array.isArray(exception.response.message)) {
-      errors = exception.response.message.map((error: any) => ({
-        field: error.property,
-        message: Object.values(error.constraints || {}).join(', '),
-        value: error.value,
-      }));
-    } else if (exception.message) {
-      message = exception.message;
+    if (typeof exceptionResponse === 'object') {
+      const responseObj = exceptionResponse as Record<string, unknown>;
+      message = (responseObj.message as string) || message;
+
+      if (Array.isArray(responseObj.message)) {
+        errors = (responseObj.message as Array<Record<string, unknown>>).map(
+          (error) =>
+            new ValidationErrorDto(
+              (error.property as string) || '',
+              Object.values(error.constraints || {}).join(', '),
+              error.value,
+            ),
+        );
+      }
     }
 
-    const errorResponse = {
-      success: false,
-      error: 'VALIDATION_ERROR',
+    const errorResponse = this.createErrorResponse(
+      'VALIDATION_ERROR',
       message,
+      request,
       errors,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      requestId: request.requestId || 'unknown',
-    };
+    );
 
     this.logger.warn(
       `Validation Error: ${message} - ${request.method} ${request.url}`,
     );
-
-    response.status(status).json(errorResponse);
+    response.status(HttpStatus.BAD_REQUEST).json(errorResponse);
   }
 }

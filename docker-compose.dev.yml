@@ -18,7 +18,7 @@ services:
     container_name: webchat-backend-dev
     build:
       context: ./backend
-      dockerfile: dockerfile.backend
+      dockerfile: Dockerfile
       target: dev
     env_file:
       - .env.development
@@ -38,7 +38,7 @@ services:
       - backend
     build:
       context: ./frontend
-      dockerfile: dockerfile.frontend
+      dockerfile: Dockerfile
       target: dev
     env_file:
       - .env.development

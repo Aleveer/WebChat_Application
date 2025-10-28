@@ -7,20 +7,21 @@ import {
   IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { APP_CONSTANTS } from '../constants/app.constants';
 
 export class PaginationDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1)
-  page?: number = 1;
+  @Min(APP_CONSTANTS.PAGINATION.DEFAULT_PAGE)
+  page?: number = APP_CONSTANTS.PAGINATION.DEFAULT_PAGE;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
+  @Min(APP_CONSTANTS.PAGINATION.MIN_LIMIT)
+  @Max(APP_CONSTANTS.PAGINATION.MAX_LIMIT)
+  limit?: number = APP_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
 
   @IsOptional()
   @IsString()
@@ -29,4 +30,8 @@ export class PaginationDto {
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

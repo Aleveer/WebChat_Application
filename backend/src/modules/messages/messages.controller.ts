@@ -8,6 +8,8 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import {
@@ -16,8 +18,11 @@ import {
   SendToUserDto,
   SendToGroupDto,
 } from './dto/create-message.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
 
 @Controller('messages')
+@UseGuards(JwtAuthGuard, RateLimitGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
@@ -34,16 +39,8 @@ export class MessagesController {
 
   @Post('send-to-user')
   @HttpCode(HttpStatus.CREATED)
-  async sendToUser(
-    @Body() sendToUserDto: SendToUserDto,
-    @Query('senderId') senderId: string,
-  ) {
-    if (!senderId) {
-      return {
-        success: false,
-        message: 'Sender ID is required',
-      };
-    }
+  async sendToUser(@Body() sendToUserDto: SendToUserDto, @Request() req) {
+    const senderId = req.user?.sub || req.user?._id;
 
     const message = await this.messagesService.sendToUser(
       sendToUserDto,
@@ -58,16 +55,8 @@ export class MessagesController {
 
   @Post('send-to-group')
   @HttpCode(HttpStatus.CREATED)
-  async sendToGroup(
-    @Body() sendToGroupDto: SendToGroupDto,
-    @Query('senderId') senderId: string,
-  ) {
-    if (!senderId) {
-      return {
-        success: false,
-        message: 'Sender ID is required',
-      };
-    }
+  async sendToGroup(@Body() sendToGroupDto: SendToGroupDto, @Request() req) {
+    const senderId = req.user?.sub || req.user?._id;
 
     const message = await this.messagesService.sendToGroup(
       sendToGroupDto,
@@ -81,16 +70,8 @@ export class MessagesController {
   }
 
   @Get()
-  async getMessages(
-    @Query() getMessagesDto: GetMessagesDto,
-    @Query('userId') userId: string,
-  ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+  async getMessages(@Query() getMessagesDto: GetMessagesDto, @Request() req) {
+    const userId = req.user?.sub || req.user?._id;
 
     const messages = await this.messagesService.getMessages(
       getMessagesDto,
@@ -130,14 +111,9 @@ export class MessagesController {
   @Get('group/:groupId/after-join')
   async getMessagesAfterJoin(
     @Param('groupId') groupId: string,
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+    const userId = req.user?.sub || req.user?._id;
 
     const messages = await this.messagesService.getMessagesAfterJoin(
       groupId,
@@ -151,16 +127,8 @@ export class MessagesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteMessage(
-    @Param('id') id: string,
-    @Query('userId') userId: string,
-  ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+  async deleteMessage(@Param('id') id: string, @Request() req) {
+    const userId = req.user?.sub || req.user?._id;
 
     await this.messagesService.deleteMessage(id, userId);
     return {

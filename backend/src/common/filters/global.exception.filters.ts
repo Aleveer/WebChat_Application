@@ -1,6 +1,5 @@
 import {
   Catch,
-  ExceptionFilter,
   ArgumentsHost,
   Logger,
   HttpStatus,
@@ -8,11 +7,11 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MongoError } from 'mongodb';
+import { BaseExceptionFilter } from './base.exception.filters';
+import { ERROR_CODES, ErrorCode } from '../constants/error-codes.constants';
 
 @Catch()
-export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
-
+export class GlobalExceptionFilter extends BaseExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -20,8 +19,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let error = 'INTERNAL_ERROR';
-    let details: any = null;
+    let error: ErrorCode = ERROR_CODES.INTERNAL_ERROR;
+    let details: unknown = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -29,32 +28,32 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        message = (exceptionResponse as any).message || exception.message;
-        details = (exceptionResponse as any).details;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const responseObj = exceptionResponse as Record<string, unknown>;
+        message = (responseObj.message as string) || exception.message;
+        details = responseObj.details;
       }
 
-      error = this.getErrorCode(status);
+      error = this.getErrorCode(status) as ErrorCode;
     } else if (exception instanceof MongoError) {
       status = HttpStatus.BAD_REQUEST;
       message = 'Database operation failed';
-      error = 'DATABASE_ERROR';
+      error = ERROR_CODES.DATABASE_ERROR;
       details = exception.message;
     } else if (exception instanceof Error) {
       message = exception.message;
-      error = 'UNKNOWN_ERROR';
+      error = ERROR_CODES.UNKNOWN_ERROR;
     }
 
-    const errorResponse = {
-      success: false,
+    const errorResponse = this.createErrorResponse(
       error,
       message,
+      request,
       details,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      requestId: request.requestId || 'unknown',
-    };
+    );
 
     this.logger.error(
       `Exception: ${error} - ${message} - ${request.method} ${request.url}`,
@@ -62,26 +61,5 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     );
 
     response.status(status).json(errorResponse);
-  }
-
-  private getErrorCode(status: number): string {
-    switch (status) {
-      case HttpStatus.BAD_REQUEST:
-        return 'BAD_REQUEST';
-      case HttpStatus.UNAUTHORIZED:
-        return 'UNAUTHORIZED';
-      case HttpStatus.FORBIDDEN:
-        return 'FORBIDDEN';
-      case HttpStatus.NOT_FOUND:
-        return 'NOT_FOUND';
-      case HttpStatus.CONFLICT:
-        return 'CONFLICT';
-      case HttpStatus.UNPROCESSABLE_ENTITY:
-        return 'VALIDATION_ERROR';
-      case HttpStatus.TOO_MANY_REQUESTS:
-        return 'RATE_LIMIT_EXCEEDED';
-      default:
-        return 'INTERNAL_ERROR';
-    }
   }
 }

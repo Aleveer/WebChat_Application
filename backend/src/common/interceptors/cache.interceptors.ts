@@ -4,36 +4,42 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request } from 'express';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 
-// Cache Interceptor
+// Cache Interceptor with native NestJS cache
 @Injectable()
 export class CacheInterceptor implements NestInterceptor {
-  private readonly cache = new Map<string, { data: any; expiry: number }>();
+  private readonly logger = new Logger(CacheInterceptor.name);
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+
+  async intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Promise<Observable<unknown>> {
     const request = context.switchToHttp().getRequest<Request>();
     const cacheKey = this.generateCacheKey(request);
-    const cached = this.cache.get(cacheKey);
 
-    if (cached && cached.expiry > Date.now()) {
+    // Check cache first
+    const cached = await this.getFromCache(cacheKey);
+    if (cached) {
       return new Observable((observer) => {
-        observer.next(cached.data);
+        observer.next(cached);
         observer.complete();
       });
     }
 
     return next.handle().pipe(
-      tap((data) => {
+      tap(async (data) => {
         const ttl = this.getCacheTTL(context);
         if (ttl > 0) {
-          this.cache.set(cacheKey, {
-            data,
-            expiry: Date.now() + ttl,
-          });
+          await this.setCache(cacheKey, data, ttl);
         }
       }),
     );
@@ -42,12 +48,40 @@ export class CacheInterceptor implements NestInterceptor {
   private generateCacheKey(request: Request): string {
     const { method, url, query } = request;
     const queryString = JSON.stringify(query);
-    return `${method}:${url}:${queryString}`;
+    return `cache:${method}:${url}:${queryString}`;
   }
 
   private getCacheTTL(context: ExecutionContext): number {
     // Get TTL from metadata or use default
     const cacheConfig = Reflect.getMetadata('cache', context.getHandler());
     return cacheConfig?.ttl || 0;
+  }
+
+  private async getFromCache(key: string): Promise<unknown> {
+    try {
+      const cached = await this.cacheManager.get<unknown>(key);
+      if (cached) {
+        this.logger.debug(`Cache HIT: ${key}`);
+        return cached;
+      }
+      this.logger.debug(`Cache MISS: ${key}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to get from cache: ${key}`, error);
+      return null;
+    }
+  }
+
+  private async setCache(
+    key: string,
+    data: unknown,
+    ttl: number,
+  ): Promise<void> {
+    try {
+      await this.cacheManager.set(key, data, ttl);
+      this.logger.debug(`Cached: ${key}, TTL: ${ttl}s`);
+    } catch (error) {
+      this.logger.error(`Failed to set cache: ${key}`, error);
+    }
   }
 }

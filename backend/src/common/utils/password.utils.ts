@@ -1,52 +1,36 @@
-import * as crypto from 'crypto';
-import * as bcrypt from 'bcryptjs';
-
+import * as bcrypt from 'bcrypt';
+import { SECURITY_CONSTANTS } from '../constants/app.constants';
+import { APP_CONSTANTS } from '../constants/app.constants';
 export class PasswordUtils {
   /**
-   * Tạo salt ngẫu nhiên
+   * Hash password using bcrypt (recommended method)
+   * @param password - Plain text password
+   * @returns Promise<string> - Hashed password
    */
-  static generateSalt(): string {
-    return crypto.randomBytes(16).toString('hex');
+  static async hashPassword(password: string): Promise<string> {
+    try {
+      const saltRounds = SECURITY_CONSTANTS.BCRYPT_ROUNDS;
+      return await bcrypt.hash(password, saltRounds);
+    } catch (error) {
+      throw new Error(`Password hashing failed: ${error.message}`);
+    }
   }
 
   /**
-   * Hash password với SHA-256 và salt
-   */
-  static hashPassword(password: string, salt: string): string {
-    return crypto
-      .createHash('sha256')
-      .update(password + salt)
-      .digest('hex');
-  }
-
-  /**
-   * Tạo salt và hash password
-   */
-  static hashPasswordWithSalt(password: string): {
-    hash: string;
-    salt: string;
-  } {
-    const salt = this.generateSalt();
-    const hash = this.hashPassword(password, salt);
-    return { hash, salt };
-  }
-
-  /**
-   * Verify password với hash và salt đã lưu
-   */
-  static verifyPassword(password: string, hash: string, salt: string): boolean {
-    const hashedPassword = this.hashPassword(password, salt);
-    return hashedPassword === hash;
-  }
-
-  /**
-   * So sánh password với hash
+   * Compare password with bcrypt hash
+   * @param password - Plain text password
+   * @param hash - Bcrypt hash
+   * @returns Promise<boolean> - True if passwords match
    */
   static async comparePassword(
     password: string,
     hash: string,
   ): Promise<boolean> {
-    return bcrypt.compare(password, hash);
+    try {
+      return await bcrypt.compare(password, hash);
+    } catch (error) {
+      throw new Error(`Password comparison failed: ${error.message}`);
+    }
   }
 
   /**
@@ -60,25 +44,90 @@ export class PasswordUtils {
     const feedback: string[] = [];
     let score = 0;
 
-    if (password.length >= 8) score += 1;
-    else feedback.push('Password should be at least 8 characters long');
+    // Length check - Awards points for LONG passwords, not short ones
+    if (password.length >= APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH) {
+      score += 1;
+      // Bonus points for longer passwords
+      if (password.length >= 12) score += 1;
+      if (password.length >= 16) score += 1;
+    } else {
+      feedback.push(
+        `Password should be at least ${APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH} characters long`,
+      );
+    }
 
+    // Lowercase check
     if (/[a-z]/.test(password)) score += 1;
     else feedback.push('Password should contain lowercase letters');
 
+    // Uppercase check
     if (/[A-Z]/.test(password)) score += 1;
     else feedback.push('Password should contain uppercase letters');
 
+    // Number check
     if (/[0-9]/.test(password)) score += 1;
     else feedback.push('Password should contain numbers');
 
+    // Special character check
     if (/[^a-zA-Z0-9]/.test(password)) score += 1;
     else feedback.push('Password should contain special characters');
+
+    // Common password check
+    if (this.isCommonPassword(password)) {
+      feedback.push(
+        'Password is too common, please choose a stronger password',
+      );
+      score = Math.max(0, score - 2);
+    }
 
     return {
       isValid: score >= 3,
       score,
       feedback,
     };
+  }
+
+  /**
+   * Generate a random password
+   * @param length - Length of the password (default: 12)
+   * @returns Generated password
+   */
+  static generateRandomPassword(length: number = 12): string {
+    const charset =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+
+    return password;
+  }
+
+  /**
+   * Check if password is common/weak
+   * @param password - Password to check
+   * @returns boolean - True if password is common
+   */
+  static isCommonPassword(password: string): boolean {
+    const commonPasswords = [
+      'password',
+      '123456',
+      '123456789',
+      'qwerty',
+      'abc123',
+      'password123',
+      'admin',
+      'letmein',
+      'welcome',
+      'monkey',
+      '1234567890',
+      'password1',
+      'qwerty123',
+      'dragon',
+      'master',
+    ];
+
+    return commonPasswords.includes(password.toLowerCase());
   }
 }

@@ -9,30 +9,32 @@ export const APP_CONSTANTS = {
 
   // Messages
   MESSAGES: {
-    MAX_TEXT_LENGTH: 1000,
+    MAX_TEXT_LENGTH: 2000,
     MIN_TEXT_LENGTH: 1,
     DEFAULT_MESSAGE_LIMIT: 50,
   },
 
   // Users
   USERS: {
-    MIN_PASSWORD_LENGTH: 6,
+    MIN_PASSWORD_LENGTH: 8,
+    MAX_PASSWORD_LENGTH: 64,
     MIN_NAME_LENGTH: 1,
     MAX_NAME_LENGTH: 100,
     MAX_USERNAME_LENGTH: 50,
-    PHONE_REGEX: /^\+[1-9]\d{1,11}$/,
-    PROFILE_PHOTO_REGEX: /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i,
+    PHONE_REGEX: /^\+[1-9]\d{1,14}$/, // Hỗ trợ tối đa 15 số theo ITU-T E.164
+    PROFILE_PHOTO_REGEX:
+      /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?(#.*)?$/i, // Hỗ trợ query params và fragments
     EMAIL_REGEX: /^(?!.*\.\.)[^\s@]+@[^\s@]+\.[^\s@]+$/, // Email validation - prevents consecutive dots
     USERNAME_REGEX: /^[a-zA-Z0-9_]+$/, // Only alphanumeric and underscores
     FULL_NAME_REGEX: /^[a-zA-Z\s]+$/, // Only letters and spaces
-    PASSWORD_REGEX: /^[a-zA-Z0-9!@#$%^&*]+$/, // Only alphanumeric and special characters
+    PASSWORD_REGEX: /^[a-zA-Z0-9!@#$%^&*()_+=\-[\]{}|;:'",.<>?/\\`~]+$/, // Alphanumeric and common special characters
   },
 
   // Groups
   GROUPS: {
     MIN_MEMBERS: 2,
     MAX_NAME_LENGTH: 100,
-    MAX_MEMBERS: 256, // Telegram-like limit
+    MAX_MEMBERS: 256, // Member Limit
   },
 
   // JWT
@@ -45,6 +47,7 @@ export const APP_CONSTANTS = {
   PAGINATION: {
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 20,
+    MIN_LIMIT: 1,
     MAX_LIMIT: 100,
   },
 
@@ -58,6 +61,20 @@ export const APP_CONSTANTS = {
   RATE_LIMIT: {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
     MAX_REQUESTS: 100,
+  },
+
+  // API Constants
+  API_CONSTANTS: {
+    VERSION: '1.0',
+    DEFAULT_TIMEOUT: 30000, // 30 seconds
+    MAX_RETRIES: 3,
+  },
+
+  // Timeouts
+  TIMEOUTS: {
+    FILE_UPLOAD: 300000, // 5 minutes
+    DEFAULT: 30000, // 30 seconds
+    SHORT: 5000, // 5 seconds
   },
 } as const;
 
@@ -162,10 +179,9 @@ export const CACHE_KEYS = {
   MESSAGE_COUNT: 'message:count:',
 } as const;
 
-// Redis Keys
-export const REDIS_KEYS = {
-  ONLINE_USERS: 'online:users',
-  USER_SESSIONS: 'user:sessions:',
-  MESSAGE_QUEUE: 'message:queue',
-  NOTIFICATION_QUEUE: 'notification:queue',
+// Security Constants
+export const SECURITY_CONSTANTS = {
+  BCRYPT_ROUNDS: 12,
+  JWT_SECRET_MIN_LENGTH: 32,
+  SESSION_TIMEOUT: 30 * 60 * 1000, // 30 minutes
 } as const;

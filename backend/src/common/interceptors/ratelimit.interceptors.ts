@@ -3,6 +3,8 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { throwError } from 'rxjs';
@@ -10,11 +12,26 @@ import { Request } from 'express';
 
 // Rate Limiting Interceptor
 @Injectable()
-export class RateLimitInterceptor implements NestInterceptor {
+export class RateLimitInterceptor implements NestInterceptor, OnModuleInit {
+  private readonly logger = new Logger(RateLimitInterceptor.name);
   private readonly requests = new Map<
     string,
     { count: number; resetTime: number }
   >();
+  private cleanupInterval: NodeJS.Timeout;
+
+  onModuleInit() {
+    // FIXED: Cleanup expired entries every 5 minutes to prevent memory leak
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredEntries();
+    }, 5 * 60 * 1000); // 5 minutes
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -39,5 +56,23 @@ export class RateLimitInterceptor implements NestInterceptor {
 
     clientRequests.count++;
     return next.handle();
+  }
+
+  private cleanupExpiredEntries(): void {
+    const now = Date.now();
+    let expiredCount = 0;
+
+    for (const [clientId, data] of this.requests.entries()) {
+      if (now > data.resetTime) {
+        this.requests.delete(clientId);
+        expiredCount++;
+      }
+    }
+
+    if (expiredCount > 0) {
+      this.logger.debug(
+        `Cleaned up ${expiredCount} expired rate limit entries`,
+      );
+    }
   }
 }

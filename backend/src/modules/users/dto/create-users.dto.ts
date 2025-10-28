@@ -24,7 +24,7 @@ export class CreateUserDto {
   @Matches(APP_CONSTANTS.USERS.FULL_NAME_REGEX, {
     message: 'Full name must contain only letters and spaces',
   })
-  fullname: string;
+  full_name: string;
 
   @IsOptional()
   @IsString()
@@ -52,7 +52,7 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH, {
-    message: 'Password must be at least 6 characters long',
+    message: 'Password must be at least 8 characters long',
   })
   @Matches(APP_CONSTANTS.USERS.PASSWORD_REGEX, {
     message:
@@ -68,7 +68,7 @@ export class UpdateUserDto {
   @Matches(APP_CONSTANTS.USERS.FULL_NAME_REGEX, {
     message: 'Full name must contain only letters and spaces',
   })
-  fullname?: string;
+  full_name?: string;
 
   @IsOptional()
   @IsString()

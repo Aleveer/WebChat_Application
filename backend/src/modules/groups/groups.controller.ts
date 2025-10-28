@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import {
@@ -19,23 +20,18 @@ import {
   RemoveMemberDto,
   SetAdminDto,
 } from './dto/create-group.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
 
 @Controller('groups')
+@UseGuards(JwtAuthGuard, RateLimitGuard)
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Body() createGroupDto: CreateGroupDto,
-    @Query('creatorId') creatorId: string,
-  ) {
-    if (!creatorId) {
-      return {
-        success: false,
-        message: 'Creator ID is required',
-      };
-    }
+  async create(@Body() createGroupDto: CreateGroupDto, @Request() req) {
+    const creatorId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.create(createGroupDto, creatorId);
     return {
@@ -73,16 +69,8 @@ export class GroupsController {
   }
 
   @Get(':id/members')
-  async getGroupMembers(
-    @Param('id') id: string,
-    @Query('userId') userId: string,
-  ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+  async getGroupMembers(@Param('id') id: string, @Request() req) {
+    const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.getGroupMembers(id, userId);
     return {
@@ -95,14 +83,9 @@ export class GroupsController {
   async update(
     @Param('id') id: string,
     @Body() updateGroupDto: UpdateGroupDto,
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+    const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.update(id, updateGroupDto, userId);
     return {
@@ -114,13 +97,8 @@ export class GroupsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Query('userId') userId: string) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+  async remove(@Param('id') id: string, @Request() req) {
+    const userId = req.user?.sub || req.user?._id;
 
     await this.groupsService.remove(id, userId);
     return {
@@ -134,14 +112,9 @@ export class GroupsController {
   async addMember(
     @Param('id') id: string,
     @Body() addMemberDto: AddMemberDto,
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+    const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.addMember(id, addMemberDto, userId);
     return {
@@ -156,14 +129,9 @@ export class GroupsController {
   async removeMember(
     @Param('id') id: string,
     @Body() removeMemberDto: RemoveMemberDto,
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+    const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.removeMember(
       id,
@@ -182,14 +150,9 @@ export class GroupsController {
   async setAdmin(
     @Param('id') id: string,
     @Body() setAdminDto: SetAdminDto,
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
-    if (!userId) {
-      return {
-        success: false,
-        message: 'User ID is required',
-      };
-    }
+    const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.setAdmin(id, setAdminDto, userId);
     return {

@@ -37,7 +37,7 @@ export class Message {
   // Virtual field for sender info (populated)
   sender?: {
     _id: Types.ObjectId;
-    fullname: string;
+    full_name: string;
     phone_number: string;
     username?: string;
     email?: string;
@@ -48,7 +48,7 @@ export class Message {
   receiver?: {
     _id: Types.ObjectId;
     name?: string; // for groups
-    fullname?: string; // for users
+    full_name?: string; // for users
     phone_number?: string; // for users
     username?: string; // for users
   };
