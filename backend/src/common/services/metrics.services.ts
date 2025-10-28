@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 export interface MetricsCounter {
   [key: string]: number;
@@ -8,17 +14,123 @@ export interface MetricsHistogram {
   [key: string]: number[];
 }
 
+// Circular Buffer for efficient memory management
+class CircularBuffer {
+  private buffer: number[];
+  private head: number = 0;
+  private size: number = 0;
+  private readonly capacity: number;
+
+  constructor(capacity: number) {
+    this.capacity = capacity;
+    this.buffer = new Array(capacity);
+  }
+
+  push(value: number): void {
+    this.buffer[this.head] = value;
+    this.head = (this.head + 1) % this.capacity;
+    if (this.size < this.capacity) {
+      this.size++;
+    }
+  }
+
+  toArray(): number[] {
+    if (this.size === 0) return [];
+
+    const result: number[] = [];
+    const start = this.size < this.capacity ? 0 : this.head;
+
+    for (let i = 0; i < this.size; i++) {
+      result.push(this.buffer[(start + i) % this.capacity]);
+    }
+
+    return result;
+  }
+
+  getSize(): number {
+    return this.size;
+  }
+
+  clear(): void {
+    this.head = 0;
+    this.size = 0;
+  }
+}
+
 @Injectable()
-export class MetricsService implements OnModuleInit {
+export class MetricsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MetricsService.name);
   private readonly counters: MetricsCounter = {};
-  private readonly histograms: MetricsHistogram = {};
-  // FIXED: Use Map with compound keys to avoid race conditions
+
+  // Use CircularBuffer instead of array for better memory management
+  private readonly histograms: Map<string, CircularBuffer> = new Map();
   private readonly timers: Map<string, number> = new Map();
   private timerIdCounter = 0;
 
+  // Configuration for memory limits
+  private readonly MAX_HISTOGRAM_SIZE = 1000;
+  private readonly MAX_HISTOGRAMS = 100;
+  private readonly MAX_TIMERS = 10000;
+
+  // Cleanup interval
+  private cleanupInterval: NodeJS.Timeout;
+
   onModuleInit() {
-    this.logger.log('Metrics service initialized');
+    this.logger.log('Metrics service initialized with memory management');
+
+    // Setup periodic cleanup every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupOldTimers();
+      },
+      5 * 60 * 1000,
+    );
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    this.logger.log('Metrics service destroyed');
+  }
+
+  private cleanupOldTimers(): void {
+    const now = Date.now();
+    const timeout = 10 * 60 * 1000; // 10 minutes
+    let cleaned = 0;
+
+    for (const [key, startTime] of this.timers.entries()) {
+      if (now - startTime > timeout) {
+        this.timers.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      this.logger.warn(`Cleaned up ${cleaned} stale timers`);
+    }
+
+    if (this.timers.size > this.MAX_TIMERS) {
+      const excess = this.timers.size - this.MAX_TIMERS;
+      const keys = Array.from(this.timers.keys()).slice(0, excess);
+      keys.forEach((key) => this.timers.delete(key));
+      this.logger.warn(`Removed ${excess} timers to enforce memory limit`);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  dailyCleanup(): void {
+    this.logger.log('Running daily metrics cleanup');
+
+    // Keep only essential counters, reset others
+    const essentialCounters = ['http_requests_total', 'http_errors_total'];
+    for (const key of Object.keys(this.counters)) {
+      if (!essentialCounters.includes(key)) {
+        delete this.counters[key];
+      }
+    }
+
+    this.logger.log('Daily cleanup completed');
   }
 
   // Increment a counter
@@ -36,7 +148,7 @@ export class MetricsService implements OnModuleInit {
     // Generate unique timer key using name + requestId (or auto-increment ID)
     const uniqueId = requestId || `${name}_${++this.timerIdCounter}`;
     const timerKey = `${name}:${uniqueId}`;
-    
+
     this.timers.set(timerKey, Date.now());
     return timerKey;
   }
@@ -55,34 +167,31 @@ export class MetricsService implements OnModuleInit {
     // Extract metric name from timer key (before the colon)
     const metricName = timerKey.split(':')[0];
 
-    if (!this.histograms[metricName]) {
-      this.histograms[metricName] = [];
-    }
-
-    // FIXED: Check size BEFORE pushing to prevent memory spikes
-    if (this.histograms[metricName].length >= 1000) {
-      // Remove oldest 10% to reduce frequency of array operations
-      this.histograms[metricName] = this.histograms[metricName].slice(-900);
-    }
-
-    this.histograms[metricName].push(duration);
+    // Use CircularBuffer
+    this.recordHistogram(metricName, duration);
 
     return duration;
   }
 
   // Record a value in histogram
   recordHistogram(name: string, value: number): void {
-    if (!this.histograms[name]) {
-      this.histograms[name] = [];
+    //Enforce max histograms limit
+    if (
+      !this.histograms.has(name) &&
+      this.histograms.size >= this.MAX_HISTOGRAMS
+    ) {
+      this.logger.warn(
+        `Max histograms limit (${this.MAX_HISTOGRAMS}) reached. Skipping: ${name}`,
+      );
+      return;
     }
 
-    // FIXED: Check size BEFORE pushing to prevent memory spikes
-    if (this.histograms[name].length >= 1000) {
-      // Remove oldest 10% to reduce frequency of array operations
-      this.histograms[name] = this.histograms[name].slice(-900);
+    //Use CircularBuffer for automatic memory management
+    if (!this.histograms.has(name)) {
+      this.histograms.set(name, new CircularBuffer(this.MAX_HISTOGRAM_SIZE));
     }
 
-    this.histograms[name].push(value);
+    this.histograms.get(name)!.push(value);
   }
 
   // Get counter value
@@ -105,11 +214,12 @@ export class MetricsService implements OnModuleInit {
     p95: number;
     p99: number;
   } | null {
-    const values = this.histograms[name];
-    if (!values || values.length === 0) {
+    const buffer = this.histograms.get(name);
+    if (!buffer || buffer.getSize() === 0) {
       return null;
     }
 
+    const values = buffer.toArray();
     const sorted = [...values].sort((a, b) => a - b);
     const count = sorted.length;
     const min = sorted[0];
@@ -148,12 +258,14 @@ export class MetricsService implements OnModuleInit {
         p99: number;
       } | null
     > = {};
-    for (const name of Object.keys(this.histograms)) {
+
+    for (const name of this.histograms.keys()) {
       const stats = this.getHistogramStats(name);
       if (stats) {
         result[name] = stats;
       }
     }
+
     return result;
   }
 
@@ -162,9 +274,7 @@ export class MetricsService implements OnModuleInit {
     Object.keys(this.counters).forEach((key) => {
       delete this.counters[key];
     });
-    Object.keys(this.histograms).forEach((key) => {
-      delete this.histograms[key];
-    });
+    this.histograms.clear();
     this.timers.clear();
     this.logger.log('All metrics reset');
   }

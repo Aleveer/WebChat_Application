@@ -20,6 +20,7 @@ import {
 } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
 import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ResponseUtils } from '../../common/utils/response.utils';
 
 @Controller('messages')
 @UseGuards(JwtAuthGuard, RateLimitGuard)
@@ -30,11 +31,7 @@ export class MessagesController {
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createMessageDto: CreateMessageDto) {
     const message = await this.messagesService.create(createMessageDto);
-    return {
-      success: true,
-      message: 'Message sent successfully',
-      data: message,
-    };
+    return ResponseUtils.success(message, 'Message sent successfully');
   }
 
   @Post('send-to-user')
@@ -46,11 +43,7 @@ export class MessagesController {
       sendToUserDto,
       senderId,
     );
-    return {
-      success: true,
-      message: 'Message sent successfully',
-      data: message,
-    };
+    return ResponseUtils.success(message, 'Message sent successfully');
   }
 
   @Post('send-to-group')
@@ -62,11 +55,7 @@ export class MessagesController {
       sendToGroupDto,
       senderId,
     );
-    return {
-      success: true,
-      message: 'Message sent successfully',
-      data: message,
-    };
+    return ResponseUtils.success(message, 'Message sent successfully');
   }
 
   @Get()
@@ -77,10 +66,7 @@ export class MessagesController {
       getMessagesDto,
       userId,
     );
-    return {
-      success: true,
-      data: messages,
-    };
+    return ResponseUtils.success(messages);
   }
 
   @Get('conversation/:userId1/:userId2')
@@ -92,20 +78,14 @@ export class MessagesController {
       userId1,
       userId2,
     );
-    return {
-      success: true,
-      data: messages,
-    };
+    return ResponseUtils.success(messages);
   }
 
   @Get('recent/:userId')
   async getRecentConversations(@Param('userId') userId: string) {
     const conversations =
       await this.messagesService.getRecentConversations(userId);
-    return {
-      success: true,
-      data: conversations,
-    };
+    return ResponseUtils.success(conversations);
   }
 
   @Get('group/:groupId/after-join')
@@ -119,10 +99,7 @@ export class MessagesController {
       groupId,
       userId,
     );
-    return {
-      success: true,
-      data: messages,
-    };
+    return ResponseUtils.success(messages);
   }
 
   @Delete(':id')
@@ -131,9 +108,6 @@ export class MessagesController {
     const userId = req.user?.sub || req.user?._id;
 
     await this.messagesService.deleteMessage(id, userId);
-    return {
-      success: true,
-      message: 'Message deleted successfully',
-    };
+    return ResponseUtils.success(null, 'Message deleted successfully');
   }
 }

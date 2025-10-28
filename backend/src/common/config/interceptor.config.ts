@@ -3,41 +3,33 @@
  * Centralized configuration for all interceptors
  */
 export interface InterceptorConfig {
-  // Timeout Configuration
   timeout: {
     default: number;
     short: number;
     fileUpload: number;
   };
 
-  // Rate Limiting Configuration
   rateLimit: {
     windowMs: number;
     maxRequests: number;
     cleanupIntervalMs: number;
   };
 
-  // Cache Configuration
   cache: {
     defaultTtl: number;
     maxTtl: number;
   };
 
-  // Compression Configuration
   compression: {
     threshold: number;
     level: number;
   };
 
-  // Performance Monitoring
   performance: {
     slowRequestThreshold: number;
   };
 }
 
-/**
- * Default Interceptor Configuration
- */
 export const DEFAULT_INTERCEPTOR_CONFIG: InterceptorConfig = {
   timeout: {
     default: 30000, // 30 seconds

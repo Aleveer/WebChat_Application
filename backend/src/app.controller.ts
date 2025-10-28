@@ -45,5 +45,4 @@ export class AppController {
       data: health,
     };
   }
-
 }

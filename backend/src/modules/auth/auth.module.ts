@@ -17,10 +17,10 @@ import { LocalStrategy } from './strategies/local.strategy';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const secret = configService.get<string>('jwt.secret');
-        const expiresIn = configService.get<string>('jwt.expiresIn') || '7d';
+        const expiresIn = configService.get<string>('jwt.expiresIn');
 
         return {
-          secret: secret || '',
+          secret: secret,
           signOptions: {
             expiresIn,
           },

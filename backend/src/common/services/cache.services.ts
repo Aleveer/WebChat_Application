@@ -16,8 +16,6 @@ export class CacheService {
       this.logger.debug(`Cache set: ${key}, TTL: ${ttl}s`);
     } catch (error) {
       this.logger.error(`Failed to set cache for key ${key}:`, error);
-      // Rethrow to allow caller to handle cache failure
-      throw new Error(`Cache set failed for key ${key}: ${error.message}`);
     }
   }
 
@@ -28,8 +26,8 @@ export class CacheService {
       return cached ?? null;
     } catch (error) {
       this.logger.error(`Failed to get cache for key ${key}:`, error);
-      // Rethrow error instead of silently returning null to allow caller to handle
-      throw new Error(`Cache retrieval failed for key ${key}: ${error.message}`);
+      // This allows the application to continue and fetch data from source
+      return null;
     }
   }
 
@@ -40,18 +38,19 @@ export class CacheService {
       return true;
     } catch (error) {
       this.logger.error(`Failed to delete cache for key ${key}:`, error);
-      // Rethrow instead of returning false to distinguish between "not found" and "error"
-      throw new Error(`Cache deletion failed for key ${key}: ${error.message}`);
+      // Allows graceful degradation - app continues even if cache delete fails
+      return false;
     }
   }
 
   async clear(): Promise<void> {
     try {
-      // Note: reset() method doesn't exist in cache-manager v6
-      // For now, log that cache would be cleared
-      this.logger.log('Cache clear requested (not implemented in v6)');
+      // Type assertion needed as reset() is available in cache-manager v7+ but not in type definitions
+      await (this.cacheManager as any).reset();
+      this.logger.log('Cache cleared successfully');
     } catch (error) {
       this.logger.error('Failed to clear cache:', error);
+      throw error;
     }
   }
 
@@ -64,8 +63,8 @@ export class CacheService {
         `Failed to check cache existence for key ${key}:`,
         error,
       );
-      // Rethrow error - cache check failure should not silently return false
-      throw new Error(`Cache existence check failed for key ${key}: ${error.message}`);
+      // Prevents cache errors from breaking application logic
+      return false;
     }
   }
 

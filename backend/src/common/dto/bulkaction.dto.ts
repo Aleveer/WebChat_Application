@@ -6,7 +6,6 @@ import {
   IsIn,
 } from 'class-validator';
 
-// Bulk Action DTO
 export class BulkActionDto {
   @IsArray()
   @IsString({ each: true })

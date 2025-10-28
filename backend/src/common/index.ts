@@ -1,8 +1,5 @@
-// Common Module - Export all shared utilities
-
 // Constants
 export * from './constants/app.constants';
-export * from './constants/error-codes.constants';
 
 // Configuration
 export * from './config/common-module.config';
@@ -71,12 +68,15 @@ export * from './services/healthcheck.services';
 export * from './services/notification.services';
 
 // Utils
+export * from './utils/arrays.utils';
 export * from './utils/date.utils';
+export * from './utils/env-validation.utils';
 export * from './utils/files.utils';
 export * from './utils/object.utils';
 export * from './utils/pagination.utils';
 export * from './utils/password.utils';
 export * from './utils/response.utils';
+export * from './utils/sanitization.utils';
 export * from './utils/string.utils';
 export * from './utils/validation.utils';
 export * from './utils/error-response.formatter';

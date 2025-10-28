@@ -4,30 +4,30 @@ import { Injectable, Logger } from '@nestjs/common';
  * Circuit Breaker States
  */
 export enum CircuitState {
-  CLOSED = 'CLOSED',     // Normal operation
-  OPEN = 'OPEN',         // Failing, reject requests
-  HALF_OPEN = 'HALF_OPEN' // Testing if service recovered
+  CLOSED = 'CLOSED', // Normal operation
+  OPEN = 'OPEN', // Failing, reject requests
+  HALF_OPEN = 'HALF_OPEN', // Testing if service recovered
 }
 
 /**
  * Circuit Breaker Configuration
  */
 export interface CircuitBreakerConfig {
-  failureThreshold: number;      // Number of failures before opening circuit
-  successThreshold: number;      // Number of successes to close circuit from half-open
-  timeout: number;               // Timeout in ms before trying half-open
-  monitoringPeriod: number;      // Time window to count failures (ms)
+  failureThreshold: number; // Number of failures before opening circuit
+  successThreshold: number; // Number of successes to close circuit from half-open
+  timeout: number; // Timeout in ms before trying half-open
+  monitoringPeriod: number; // Time window to count failures (ms)
 }
 
 /**
  * Circuit Breaker Pattern Implementation
- * 
+ *
  * Prevents cascading failures by stopping requests to failing services
  * States:
  * - CLOSED: Normal operation, requests pass through
  * - OPEN: Service is failing, reject all requests immediately
  * - HALF_OPEN: Testing if service recovered, allow limited requests
- * 
+ *
  * @example
  * ```typescript
  * const breaker = new CircuitBreaker('email-service', {
@@ -36,7 +36,7 @@ export interface CircuitBreakerConfig {
  *   timeout: 60000,
  *   monitoringPeriod: 120000
  * });
- * 
+ *
  * try {
  *   const result = await breaker.execute(() => sendEmail(...));
  * } catch (error) {
@@ -47,7 +47,7 @@ export interface CircuitBreakerConfig {
 @Injectable()
 export class CircuitBreaker {
   private readonly logger = new Logger(CircuitBreaker.name);
-  
+
   private state: CircuitState = CircuitState.CLOSED;
   private failureCount = 0;
   private successCount = 0;
@@ -84,24 +84,26 @@ export class CircuitBreaker {
         error.name = 'CircuitBreakerOpenError';
         throw error;
       }
-      
+
       // Timeout expired, move to half-open to test
       this.state = CircuitState.HALF_OPEN;
-      this.logger.log(`Circuit breaker for ${this.serviceName} entering HALF_OPEN state`);
+      this.logger.log(
+        `Circuit breaker for ${this.serviceName} entering HALF_OPEN state`,
+      );
     }
 
     try {
       // Execute the function
       const result = await fn();
-      
+
       // Success - handle based on current state
       this.onSuccess();
-      
+
       return result;
     } catch (error) {
       // Failure - handle based on current state
       this.onFailure(error);
-      
+
       throw error;
     }
   }
@@ -119,7 +121,7 @@ export class CircuitBreaker {
       this.logger.warn(
         `Circuit breaker for ${this.serviceName} executing fallback due to: ${error.message}`,
       );
-      
+
       return typeof fallback === 'function' ? await fallback() : fallback;
     }
   }
@@ -132,11 +134,13 @@ export class CircuitBreaker {
 
     if (this.state === CircuitState.HALF_OPEN) {
       this.successCount++;
-      
+
       if (this.successCount >= this.config.successThreshold) {
         this.state = CircuitState.CLOSED;
         this.successCount = 0;
-        this.logger.log(`Circuit breaker for ${this.serviceName} CLOSED (service recovered)`);
+        this.logger.log(
+          `Circuit breaker for ${this.serviceName} CLOSED (service recovered)`,
+        );
       }
     }
   }
@@ -147,7 +151,7 @@ export class CircuitBreaker {
   private onFailure(error: Error): void {
     this.failureCount++;
     this.lastFailureTime = Date.now();
-    
+
     this.logger.error(
       `Circuit breaker for ${this.serviceName} recorded failure ${this.failureCount}/${this.config.failureThreshold}: ${error.message}`,
     );
@@ -157,7 +161,7 @@ export class CircuitBreaker {
       this.state = CircuitState.OPEN;
       this.successCount = 0;
       this.nextAttempt = Date.now() + this.config.timeout;
-      
+
       this.logger.warn(
         `Circuit breaker for ${this.serviceName} OPENED (failed during half-open test)`,
       );
@@ -165,7 +169,7 @@ export class CircuitBreaker {
       // Threshold reached, open the circuit
       this.state = CircuitState.OPEN;
       this.nextAttempt = Date.now() + this.config.timeout;
-      
+
       this.logger.warn(
         `Circuit breaker for ${this.serviceName} OPENED (threshold ${this.config.failureThreshold} reached)`,
       );
@@ -183,7 +187,7 @@ export class CircuitBreaker {
     ) {
       this.failureCount = 0;
       this.lastFailureTime = 0;
-      
+
       this.logger.debug(
         `Circuit breaker for ${this.serviceName} reset failure count (monitoring period expired)`,
       );
@@ -223,7 +227,7 @@ export class CircuitBreaker {
     this.successCount = 0;
     this.nextAttempt = Date.now();
     this.lastFailureTime = 0;
-    
+
     this.logger.log(`Circuit breaker for ${this.serviceName} manually reset`);
   }
 
@@ -233,7 +237,7 @@ export class CircuitBreaker {
   forceOpen(): void {
     this.state = CircuitState.OPEN;
     this.nextAttempt = Date.now() + this.config.timeout;
-    
+
     this.logger.warn(`Circuit breaker for ${this.serviceName} manually opened`);
   }
 }

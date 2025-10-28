@@ -26,8 +26,8 @@ export class HealthController {
   @Get()
   @Public()
   @ApiOperation({ summary: 'Get overall health status' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service is healthy',
     schema: {
       example: {
@@ -37,14 +37,14 @@ export class HealthController {
           database: {
             status: 'healthy',
             responseTime: 15,
-            details: { database: 'webchat', readyState: 1 }
-          }
-        }
-      }
-    }
+            details: { database: 'webchat', readyState: 1 },
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 503, 
+  @ApiResponse({
+    status: 503,
     description: 'Service is unhealthy',
     schema: {
       example: {
@@ -54,18 +54,18 @@ export class HealthController {
           database: {
             status: 'unhealthy',
             responseTime: 5000,
-            details: { error: 'Connection timeout' }
-          }
-        }
-      }
-    }
+            details: { error: 'Connection timeout' },
+          },
+        },
+      },
+    },
   })
   async getHealth() {
     const health = await this.healthCheckService.getOverallHealth();
-    
+
     // Return 503 if any service is unhealthy
     const httpStatus = health.status === 'healthy' ? 200 : 503;
-    
+
     return {
       statusCode: httpStatus,
       ...health,
@@ -113,7 +113,7 @@ export class HealthController {
   @ApiExcludeEndpoint()
   async getReadiness() {
     const health = await this.healthCheckService.getOverallHealth();
-    
+
     return {
       status: health.status === 'healthy' ? 'ready' : 'not ready',
       timestamp: health.timestamp,

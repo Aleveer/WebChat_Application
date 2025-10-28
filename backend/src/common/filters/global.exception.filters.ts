@@ -8,7 +8,7 @@ import {
 import { Request, Response } from 'express';
 import { MongoError } from 'mongodb';
 import { BaseExceptionFilter } from './base.exception.filters';
-import { ERROR_CODES, ErrorCode } from '../constants/error-codes.constants';
+import { ERROR_CODES, ErrorCode } from '../constants/app.constants';
 
 @Catch()
 export class GlobalExceptionFilter extends BaseExceptionFilter {

@@ -5,14 +5,16 @@ import {
   CallHandler,
   Logger,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { throwError } from 'rxjs';
 import { Request } from 'express';
 
-// Rate Limiting Interceptor
 @Injectable()
-export class RateLimitInterceptor implements NestInterceptor, OnModuleInit {
+export class RateLimitInterceptor
+  implements NestInterceptor, OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(RateLimitInterceptor.name);
   private readonly requests = new Map<
     string,
@@ -21,10 +23,13 @@ export class RateLimitInterceptor implements NestInterceptor, OnModuleInit {
   private cleanupInterval: NodeJS.Timeout;
 
   onModuleInit() {
-    // FIXED: Cleanup expired entries every 5 minutes to prevent memory leak
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 5 * 60 * 1000); // 5 minutes
+    // Cleanup expired entries every 5 minutes to prevent memory leak
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredEntries();
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
   }
 
   onModuleDestroy() {

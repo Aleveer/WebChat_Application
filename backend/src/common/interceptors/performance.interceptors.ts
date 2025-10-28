@@ -13,7 +13,6 @@ import { Request } from 'express';
 import type { InterceptorConfig } from '../config/interceptor.config';
 import { DEFAULT_INTERCEPTOR_CONFIG } from '../config/interceptor.config';
 
-// Performance Interceptor
 @Injectable()
 export class PerformanceInterceptor implements NestInterceptor {
   private readonly logger = new Logger(PerformanceInterceptor.name);

@@ -30,7 +30,7 @@ interface AuthenticatedSocket extends Socket {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   },
   namespace: '/chat',
@@ -77,15 +77,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join user to their personal room
       await client.join(`user:${payload.sub}`);
 
-      // Get user's groups and join group rooms
-      const userGroups = await this.groupsService.findByUserId(payload.sub);
-      for (const group of userGroups) {
-        const groupDoc = group as unknown as { _id?: Types.ObjectId };
-        const groupId = groupDoc._id?.toString();
-        if (groupId) {
-          await client.join(`group:${groupId}`);
-        }
-      }
+      // Load groups lazily, not on connection
+      // Groups will be joined when user actually navigates to them
+      // This reduces connection time from O(n) to O(1) where n = number of groups
 
       // Track analytics
       await this.analyticsService.trackEvent({

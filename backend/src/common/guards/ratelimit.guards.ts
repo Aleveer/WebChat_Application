@@ -15,11 +15,15 @@ import { Request } from 'express';
 
 type Cache = cacheManaget.Cache;
 
-// FIXED: Added cleanup mechanism to prevent memory leak
 @Injectable()
-export class RateLimitGuard implements CanActivate, OnModuleInit, OnModuleDestroy {
+export class RateLimitGuard
+  implements CanActivate, OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(RateLimitGuard.name);
-  private readonly localCache = new Map<string, { count: number; expiresAt: number }>();
+  private readonly localCache = new Map<
+    string,
+    { count: number; expiresAt: number }
+  >();
   private cleanupInterval: NodeJS.Timeout;
 
   constructor(
@@ -28,11 +32,14 @@ export class RateLimitGuard implements CanActivate, OnModuleInit, OnModuleDestro
   ) {}
 
   onModuleInit() {
-    // FIXED: Cleanup expired entries every 5 minutes
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 5 * 60 * 1000); // 5 minutes
-    
+    // Cleanup expired entries every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredEntries();
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
+
     this.logger.log('RateLimitGuard initialized with cleanup mechanism');
   }
 
@@ -71,7 +78,9 @@ export class RateLimitGuard implements CanActivate, OnModuleInit, OnModuleDestro
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const clientId = request.ip || 'unknown';
+
+    // Get real client IP and prevent spoofing
+    const clientId = this.getClientIdentifier(request);
     const key = `rate_limit:${clientId}`;
 
     const now = Date.now();
@@ -104,7 +113,7 @@ export class RateLimitGuard implements CanActivate, OnModuleInit, OnModuleDestro
     // Increment counter in both local cache and cache manager
     this.localCache.set(key, { count: currentCount + 1, expiresAt });
     await this.incrementCount(key, windowMs);
-    
+
     return true;
   }
 
@@ -126,5 +135,81 @@ export class RateLimitGuard implements CanActivate, OnModuleInit, OnModuleDestro
     } catch (error) {
       this.logger.error('Cache error:', error);
     }
+  }
+
+  /**
+   * Get real client IP address and prevent spoofing
+   * Priority order:
+   * 1. X-Real-IP (if from trusted proxy)
+   * 2. First IP in X-Forwarded-For (if from trusted proxy)
+   * 3. request.ip
+   * 4. Socket remote address
+   */
+  private getClientIdentifier(request: Request): string {
+    // Get the real IP address
+    let clientIp: string | undefined;
+
+    // Option 1: X-Real-IP header (commonly used by nginx)
+    const xRealIp = request.headers['x-real-ip'] as string;
+    if (xRealIp && this.isValidIp(xRealIp)) {
+      clientIp = xRealIp;
+    }
+
+    // Option 2: X-Forwarded-For header (get the FIRST IP, not last)
+    // Format: "client, proxy1, proxy2"
+    if (!clientIp) {
+      const xForwardedFor = request.headers['x-forwarded-for'] as string;
+      if (xForwardedFor) {
+        const ips = xForwardedFor.split(',').map((ip) => ip.trim());
+        // Take the first IP (original client) and validate it
+        const firstIp = ips[0];
+        if (firstIp && this.isValidIp(firstIp)) {
+          clientIp = firstIp;
+        }
+      }
+    }
+
+    // Option 3: Express request.ip
+    if (!clientIp && request.ip) {
+      clientIp = request.ip;
+    }
+
+    // Option 4: Socket remote address
+    if (!clientIp) {
+      clientIp = request.socket?.remoteAddress;
+    }
+
+    // Sanitize IP to prevent injection attacks
+    const sanitizedIp = this.sanitizeIp(clientIp || 'unknown');
+
+    // Add user ID if authenticated for better rate limiting
+    // Type-safe access to user property
+    const user = request.user as { id?: string } | undefined;
+    const userId = user?.id;
+    if (userId) {
+      return `${sanitizedIp}:${userId}`;
+    }
+
+    return sanitizedIp;
+  }
+
+  /**
+   * Validate IP address format (IPv4 or IPv6)
+   */
+  private isValidIp(ip: string): boolean {
+    // IPv4 pattern
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    // IPv6 pattern (simplified)
+    const ipv6Pattern = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+
+    return ipv4Pattern.test(ip) || ipv6Pattern.test(ip);
+  }
+
+  /**
+   * Sanitize IP to prevent injection
+   */
+  private sanitizeIp(ip: string): string {
+    // Remove any non-IP characters (keep only digits, dots, colons for IPv6)
+    return ip.replace(/[^0-9a-fA-F:.]/g, '').substring(0, 45); // Max IPv6 length
   }
 }

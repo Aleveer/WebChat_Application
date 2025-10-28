@@ -1,12 +1,13 @@
 export const databaseConfig = () => ({
   database: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/webchat',
+    uri: process.env.MONGODB_URI,
     options: {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+      maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE, 10),
+      serverSelectionTimeoutMS:
+        parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT_MS, 10),
+      socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT_MS, 10),
       bufferMaxEntries: 0,
       bufferCommands: false,
     },

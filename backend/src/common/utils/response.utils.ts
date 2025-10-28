@@ -1,4 +1,3 @@
-// Response Utilities
 import { PaginationUtils } from './pagination.utils';
 export class ResponseUtils {
   static success<T>(data?: T, message?: string) {

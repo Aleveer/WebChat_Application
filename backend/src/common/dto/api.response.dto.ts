@@ -1,7 +1,6 @@
 import { ValidationErrorDto } from './validation.error.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
-// API Response DTO for consistent responses
 export class ApiResponseDto<T = unknown> {
   @ApiProperty()
   success: boolean;

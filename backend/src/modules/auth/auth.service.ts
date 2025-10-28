@@ -7,7 +7,6 @@ import { JwtService } from '@nestjs/jwt';
 import { Types } from 'mongoose';
 import { UsersService } from '../users/users.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { PasswordUtils } from '../../common/utils/password.utils';
 
 @Injectable()
 export class AuthService {
@@ -103,16 +102,8 @@ export class AuthService {
       }
     }
 
-    // Hash password
-    const hashedPassword = await PasswordUtils.hashPassword(
-      registerDto.password,
-    );
-
-    // Create user
-    const user = await this.usersService.create({
-      ...registerDto,
-      password: hashedPassword,
-    });
+    // Create user (password will be hashed automatically by User schema pre-save hook)
+    const user = await this.usersService.create(registerDto);
 
     const userDoc = user as unknown as {
       _id?: Types.ObjectId;
@@ -120,6 +111,13 @@ export class AuthService {
       [key: string]: unknown;
     };
     const userId = userDoc.id || userDoc._id?.toString();
+
+    // Validate userId exists before proceeding
+    if (!userId) {
+      throw new BadRequestException(
+        'User ID could not be determined from user document',
+      );
+    }
 
     const payload = {
       sub: userId,

@@ -1,17 +1,19 @@
+import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { SanitizationInterceptor } from './sanitization.interceptors';
-import { ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { of } from 'rxjs';
-import { Test, TestingModule } from '@nestjs/testing';
+import { Request } from 'express';
 
-describe('SanitizationInterceptor', () => {
+describe('SanitizationInterceptor - White Box Testing', () => {
   let interceptor: SanitizationInterceptor;
   let mockExecutionContext: ExecutionContext;
   let mockCallHandler: CallHandler;
-  let mockRequest: any;
-  let loggerLogMock: jest.SpyInstance;
+  let mockRequest: Partial<Request>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     interceptor = new SanitizationInterceptor();
+    mockCallHandler = {
+      handle: jest.fn(() => of({})),
+    };
 
     mockRequest = {
       body: {},
@@ -21,836 +23,777 @@ describe('SanitizationInterceptor', () => {
     mockExecutionContext = {
       switchToHttp: jest.fn().mockReturnValue({
         getRequest: jest.fn().mockReturnValue(mockRequest),
-        getResponse: jest.fn().mockReturnValue({}),
       }),
-      getType: jest.fn().mockReturnValue('http'),
-      getClass: jest.fn(),
-      getHandler: jest.fn(),
-      getArgs: jest.fn(),
-      getArgByIndex: jest.fn(),
-      switchToRpc: jest.fn(),
-      switchToWs: jest.fn(),
     } as any;
-
-    mockCallHandler = {
-      handle: jest.fn().mockReturnValue(of({ success: true })),
-    } as any;
-
-    loggerLogMock = jest
-      .spyOn((interceptor as any)['logger'] as Logger, 'log')
-      .mockImplementation();
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-    jest.clearAllMocks();
-  });
-
-  describe('intercept', () => {
-    it('should sanitize request body', (done) => {
+  describe('intercept() - Main Entry Point', () => {
+    it('should sanitize request body when present', (done) => {
       mockRequest.body = {
-        username: 'test<script>alert("xss")</script>',
-        email: 'test@example.com',
+        message: '<script>alert("XSS")</script>Hello',
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.username).toBe('test');
-          expect(mockRequest.body.email).toBe('test@example.com');
-          expect(mockCallHandler.handle).toHaveBeenCalled();
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body.message).toBe('Hello');
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should sanitize query parameters', (done) => {
+    it('should sanitize query parameters when present', (done) => {
       mockRequest.query = {
-        search: 'test<script>alert("xss")</script>',
-        page: '1',
+        search: '<iframe>malicious</iframe>',
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.query.search).toBe('test');
-          expect(mockRequest.query.page).toBe('1');
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.query.search).toBe('');
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should sanitize both body and query', (done) => {
-      mockRequest.body = {
-        content: '<script>alert("body")</script>message',
-      };
-      mockRequest.query = {
-        filter: '<script>alert("query")</script>filter',
-      };
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.content).toBe('message');
-          expect(mockRequest.query.filter).toBe('filter');
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle null body', (done) => {
-      mockRequest.body = null;
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body).toBeNull();
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle undefined body', (done) => {
+    it('should handle request with no body or query', (done) => {
       mockRequest.body = undefined;
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body).toBeUndefined();
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle empty body', (done) => {
-      mockRequest.body = {};
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body).toEqual({});
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle null query', (done) => {
-      mockRequest.query = null;
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.query).toBeNull();
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle undefined query', (done) => {
       mockRequest.query = undefined;
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body).toBeUndefined();
           expect(mockRequest.query).toBeUndefined();
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should call next.handle()', (done) => {
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
+    it('should sanitize both body and query simultaneously', (done) => {
+      mockRequest.body = { text: '<script>evil</script>' };
+      mockRequest.query = { param: 'javascript:alert(1)' };
 
-      result$.subscribe({
-        next: () => {
-          expect(mockCallHandler.handle).toHaveBeenCalledTimes(1);
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body.text).toBe('');
+          expect(mockRequest.query.param).toBe('alert(1)');
           done();
         },
-        error: done.fail,
-      });
-    });
-
-    it('should return observable from next.handle()', (done) => {
-      const testData = { message: 'test response' };
-      mockCallHandler.handle = jest.fn().mockReturnValue(of(testData));
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: (data) => {
-          expect(data).toEqual(testData);
-          done();
-        },
-        error: done.fail,
       });
     });
   });
 
-  describe('sanitizeObject - XSS Protection', () => {
-    it('should remove script tags', () => {
-      const input = { text: '<script>alert("xss")</script>hello' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
+  describe('sanitizeObject() - Path Coverage', () => {
+    it('should handle string input directly', () => {
+      const result = (interceptor as any).sanitizeObject('<script>test</script>');
+      expect(result).toBe('test');
     });
 
-    it('should remove script tags with attributes', () => {
-      const input = {
-        text: '<script type="text/javascript">alert("xss")</script>hello',
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
-    });
-
-    it('should remove multiple script tags', () => {
-      const input = { text: '<script>1</script>hello<script>2</script>world' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('helloworld');
-    });
-
-    it('should remove script tags case-insensitively', () => {
-      const input = { text: '<SCRIPT>alert("xss")</SCRIPT>hello' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
-    });
-
-    it('should remove mixed case script tags', () => {
-      const input = { text: '<ScRiPt>alert("xss")</sCrIpT>hello' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
-    });
-
-    it('should remove javascript: protocol', () => {
-      const input = { link: 'javascript:alert("xss")' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.link).toBe('alert("xss")');
-    });
-
-    it('should remove javascript: protocol case-insensitively', () => {
-      const input = { link: 'JAVASCRIPT:alert("xss")' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.link).toBe('alert("xss")');
-    });
-
-    it('should remove javascript: protocol with mixed case', () => {
-      const input = { link: 'JaVaScRiPt:alert("xss")' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.link).toBe('alert("xss")');
-    });
-
-    it('should remove onclick event handler', () => {
-      const input = { html: '<div onclick="alert()">click</div>' };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Regex removes "onclick=" but leaves the value
-      expect(result.html).toBe('<div "alert()">click</div>');
-    });
-
-    it('should remove onload event handler', () => {
-      const input = { html: '<img onload="alert()" src="x">' };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Regex removes "onload=" but leaves the value
-      expect(result.html).toBe('<img "alert()" src="x">');
-    });
-
-    it('should remove onerror event handler', () => {
-      const input = { html: '<img onerror="alert()" src="x">' };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Regex removes "onerror=" but leaves the value
-      expect(result.html).toBe('<img "alert()" src="x">');
-    });
-
-    it('should remove multiple event handlers', () => {
-      const input = { html: '<div onclick="a()" onmouseover="b()">test</div>' };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Regex removes event handler names but leaves values
-      expect(result.html).toBe('<div "a()" "b()">test</div>');
-    });
-
-    it('should remove event handlers case-insensitively', () => {
-      const input = { html: '<div ONCLICK="alert()">test</div>' };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Regex removes "ONCLICK=" but leaves the value
-      expect(result.html).toBe('<div "alert()">test</div>');
-    });
-
-    it('should trim whitespace', () => {
-      const input = { text: '  hello world  ' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello world');
-    });
-
-    it('should handle complex XSS attack', () => {
-      const input = {
-        text: '<script>alert("xss")</script>onclick="alert()"javascript:void(0)  hello  ',
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Script tags removed, onclick= removed (value kept), javascript: removed, trimmed
-      expect(result.text).toBe('"alert()"void(0)  hello');
-    });
-  });
-
-  describe('sanitizeObject - Data Types', () => {
-    it('should handle string primitives', () => {
-      const input = 'test<script>alert()</script>';
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result).toBe('test<script>alert()</script>'); // Primitives are returned as-is
-    });
-
-    it('should handle number values', () => {
-      const input = { age: 25, price: 99.99 };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.age).toBe(25);
-      expect(result.price).toBe(99.99);
-    });
-
-    it('should handle boolean values', () => {
-      const input = { active: true, deleted: false };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.active).toBe(true);
-      expect(result.deleted).toBe(false);
-    });
-
-    it('should handle null values', () => {
-      const input = { field: null };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.field).toBeNull();
-    });
-
-    it('should handle undefined values', () => {
-      const input = { field: undefined };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.field).toBeUndefined();
-    });
-
-    it('should handle Date objects', () => {
-      const date = new Date('2025-01-01');
-      const input = { createdAt: date };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Date objects are iterated as objects, converting to empty object
-      expect(result.createdAt).toEqual({});
-    });
-
-    it('should handle empty string', () => {
-      const input = { text: '' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('');
-    });
-
-    it('should handle zero', () => {
-      const input = { count: 0 };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.count).toBe(0);
-    });
-
-    it('should return null for null input', () => {
+    it('should handle null input', () => {
       const result = (interceptor as any).sanitizeObject(null);
       expect(result).toBeNull();
     });
 
-    it('should return undefined for undefined input', () => {
+    it('should handle undefined input', () => {
       const result = (interceptor as any).sanitizeObject(undefined);
       expect(result).toBeUndefined();
     });
-  });
 
-  describe('sanitizeObject - Arrays', () => {
-    it('should sanitize array of strings', () => {
+    it('should handle number input', () => {
+      const result = (interceptor as any).sanitizeObject(42);
+      expect(result).toBe(42);
+    });
+
+    it('should handle boolean input', () => {
+      const result = (interceptor as any).sanitizeObject(true);
+      expect(result).toBe(true);
+    });
+
+    it('should handle array of strings', () => {
+      const input = ['<script>alert(1)</script>', 'safe text', '<iframe>bad</iframe>'];
+      const result = (interceptor as any).sanitizeObject(input);
+      expect(result).toEqual(['alert(1)', 'safe text', '']);
+    });
+
+    it('should handle nested arrays', () => {
       const input = [
-        'test<script>alert()</script>',
-        'hello<script>xss</script>',
+        ['<script>test</script>', 'normal'],
+        ['<iframe>frame</iframe>'],
       ];
       const result = (interceptor as any).sanitizeObject(input);
-      // Arrays map over items, but strings are primitives returned as-is
-      expect(result).toEqual([
-        'test<script>alert()</script>',
-        'hello<script>xss</script>',
-      ]);
+      expect(result).toEqual([['test', 'normal'], ['']]);
     });
 
-    it('should sanitize array in object', () => {
+    it('should handle object with string values', () => {
       const input = {
-        items: ['<script>1</script>a', '<script>2</script>b'],
+        name: '<script>John</script>',
+        email: 'test@example.com',
+        bio: '<iframe>bio</iframe>',
       };
       const result = (interceptor as any).sanitizeObject(input);
-      // Array items are strings (primitives), returned as-is
-      expect(result.items).toEqual([
-        '<script>1</script>a',
-        '<script>2</script>b',
-      ]);
+      expect(result).toEqual({
+        name: 'John',
+        email: 'test@example.com',
+        bio: '',
+      });
     });
 
-    it('should sanitize nested arrays', () => {
+    it('should handle deeply nested objects', () => {
       const input = {
-        matrix: [
-          ['<script>x</script>a', 'b'],
-          ['c', '<script>y</script>d'],
-        ],
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      // Nested arrays with string primitives are returned as-is
-      expect(result.matrix).toEqual([
-        ['<script>x</script>a', 'b'],
-        ['c', '<script>y</script>d'],
-      ]);
-    });
-
-    it('should sanitize array of objects', () => {
-      const input = [
-        { name: '<script>alert()</script>John' },
-        { name: 'Jane<script>xss</script>' },
-      ];
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result).toEqual([{ name: 'John' }, { name: 'Jane' }]);
-    });
-
-    it('should handle empty array', () => {
-      const input = { items: [] };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.items).toEqual([]);
-    });
-
-    it('should handle array with mixed types', () => {
-      const input = {
-        mixed: ['<script>x</script>text', 123, true, null, undefined],
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      // String primitives in arrays are not sanitized (returned as-is)
-      expect(result.mixed).toEqual([
-        '<script>x</script>text',
-        123,
-        true,
-        null,
-        undefined,
-      ]);
-    });
-
-    it('should handle array with nested objects', () => {
-      const input = {
-        users: [
-          {
-            name: '<script>alert()</script>Alice',
-            profile: { bio: 'test<script>xss</script>' },
+        user: {
+          profile: {
+            name: '<script>alert("XSS")</script>Test',
+            settings: {
+              theme: 'dark',
+              bio: 'javascript:void(0)',
+            },
           },
-        ],
+        },
       };
       const result = (interceptor as any).sanitizeObject(input);
-      expect(result.users[0].name).toBe('Alice');
-      expect(result.users[0].profile.bio).toBe('test');
+      expect(result.user.profile.name).toBe('Test');
+      expect(result.user.profile.settings.bio).toBe('void(0)');
+    });
+
+    it('should handle mixed object with arrays and nested objects', () => {
+      const input = {
+        messages: ['<script>msg1</script>', '<iframe>msg2</iframe>'],
+        user: {
+          name: '<script>name</script>',
+        },
+        count: 10,
+        active: true,
+      };
+      const result = (interceptor as any).sanitizeObject(input);
+      expect(result.messages).toEqual(['msg1', '']);
+      expect(result.user.name).toBe('name');
+      expect(result.count).toBe(10);
+      expect(result.active).toBe(true);
     });
   });
 
-  describe('sanitizeObject - Nested Objects', () => {
-    it('should sanitize nested object', () => {
-      const input = {
-        user: {
-          name: '<script>alert()</script>John',
-          email: 'john@example.com',
-        },
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.user.name).toBe('John');
-      expect(result.user.email).toBe('john@example.com');
+  describe('sanitizeString() - Branch Coverage', () => {
+    describe('Empty and Safe Strings', () => {
+      it('should return empty string as-is', () => {
+        const result = (interceptor as any).sanitizeString('');
+        expect(result).toBe('');
+      });
+
+      it('should return safe string without modification', () => {
+        const result = (interceptor as any).sanitizeString('Hello World');
+        expect(result).toBe('Hello World');
+      });
+
+      it('should handle string with only whitespace', () => {
+        const result = (interceptor as any).sanitizeString('   ');
+        expect(result).toBe('');
+      });
+
+      it('should trim safe strings', () => {
+        const result = (interceptor as any).sanitizeString('  Hello  ');
+        expect(result).toBe('Hello');
+      });
     });
 
-    it('should sanitize deeply nested objects', () => {
-      const input = {
-        level1: {
-          level2: {
-            level3: {
-              text: '<script>alert()</script>deep',
-            },
-          },
-        },
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.level1.level2.level3.text).toBe('deep');
+    describe('Encoded Script Tags', () => {
+      it('should extract content from encoded script tags', () => {
+        const input = '&lt;script&gt;alert("test")&lt;/script&gt;';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert("test")');
+      });
+
+      it('should extract content from encoded script tags with attributes', () => {
+        const input = '&lt;script type="text/javascript"&gt;var x = 1;&lt;/script&gt;';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('var x = 1;');
+      });
+
+      it('should extract content from encoded iframe tags', () => {
+        const input = '&lt;iframe src="evil.com"&gt;content&lt;/iframe&gt;';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('content');
+      });
+
+      it('should handle multiple encoded script tags', () => {
+        const input = '&lt;script&gt;alert(1)&lt;/script&gt;text&lt;script&gt;alert(2)&lt;/script&gt;';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert(1)textalert(2)');
+      });
     });
 
-    it('should sanitize complex nested structure', () => {
-      const input = {
-        user: {
-          name: '<script>xss</script>Alice',
-          contacts: [
-            { type: 'email', value: 'alice@example.com' },
-            { type: 'phone', value: '<script>alert()</script>123' },
-          ],
-          settings: {
-            theme: 'dark',
-            notifications: {
-              email: true,
-              push: false,
-            },
-          },
-        },
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.user.name).toBe('Alice');
-      expect(result.user.contacts[1].value).toBe('123');
-      expect(result.user.settings.theme).toBe('dark');
+    describe('HTML Script Tags', () => {
+      it('should extract content from script tags', () => {
+        const input = '<script>alert("XSS")</script>Safe Text';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert("XSS")Safe Text');
+      });
+
+      it('should handle script tags with attributes', () => {
+        const input = '<script type="text/javascript" src="evil.js">content</script>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('content');
+      });
+
+      it('should handle multiline script tags', () => {
+        const input = `<script>
+          var x = 1;
+          alert(x);
+        </script>Text`;
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('var x = 1;');
+      });
+
+      it('should handle nested content in script tags', () => {
+        const input = '<script><div>content</div></script>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('&lt;div&gt;content&lt;/div&gt;');
+      });
     });
 
-    it('should handle circular-like deep nesting', () => {
-      const input = {
-        a: {
-          b: {
-            c: {
-              d: {
-                e: '<script>alert()</script>value',
-              },
-            },
-          },
-        },
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.a.b.c.d.e).toBe('value');
+    describe('Style Tags', () => {
+      it('should extract content from style tags', () => {
+        const input = '<style>body { color: red; }</style>Text';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('body { color: red; }Text');
+      });
+
+      it('should handle style tags with attributes', () => {
+        const input = '<style type="text/css">div { margin: 0; }</style>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('div { margin: 0; }');
+      });
+
+      it('should handle multiline style content', () => {
+        const input = `<style>
+          .class {
+            color: blue;
+          }
+        </style>`;
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('color: blue;');
+      });
+    });
+
+    describe('Iframe Tags', () => {
+      it('should extract content from iframe tags', () => {
+        const input = '<iframe src="malicious.com">Fallback Content</iframe>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('Fallback Content');
+      });
+
+      it('should handle iframe with multiple attributes', () => {
+        const input = '<iframe width="100" height="100" src="evil.com">text</iframe>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('text');
+      });
+
+      it('should handle empty iframe tags', () => {
+        const input = '<iframe src="test.com"></iframe>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('');
+      });
+    });
+
+    describe('Object and Embed Tags', () => {
+      it('should extract content from object tags', () => {
+        const input = '<object data="evil.swf">Content</object>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('Content');
+      });
+
+      it('should remove embed tags completely', () => {
+        const input = 'Before<embed src="malicious.swf">After';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('BeforeAfter');
+      });
+
+      it('should handle embed with attributes', () => {
+        const input = '<embed type="application/x-shockwave-flash" src="test.swf">';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('');
+      });
+    });
+
+    describe('Event Handlers', () => {
+      it('should remove onclick event handlers with double quotes', () => {
+        const input = '<div onclick="alert(1)">Click me</div>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onclick');
+        expect(result).toContain('Click me');
+      });
+
+      it('should remove onclick event handlers with single quotes', () => {
+        const input = "<div onclick='alert(1)'>Click me</div>";
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onclick');
+      });
+
+      it('should remove onerror event handlers', () => {
+        const input = '<img src="x" onerror="alert(1)">';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onerror');
+      });
+
+      it('should remove onload event handlers', () => {
+        const input = '<body onload="malicious()">Content</body>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onload');
+      });
+
+      it('should remove event handlers without quotes', () => {
+        const input = '<div onmouseover=alert(1)>Hover</div>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onmouseover');
+      });
+
+      it('should remove multiple event handlers', () => {
+        const input = '<div onclick="a()" onmouseover="b()" onload="c()">Text</div>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('onclick');
+        expect(result).not.toContain('onmouseover');
+        expect(result).not.toContain('onload');
+      });
+    });
+
+    describe('Dangerous Protocols', () => {
+      it('should remove javascript: protocol', () => {
+        const input = 'javascript:alert(1)';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert(1)');
+      });
+
+      it('should remove javascript: protocol case-insensitive', () => {
+        const input = 'JaVaScRiPt:alert(1)';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert(1)');
+      });
+
+      it('should remove vbscript: protocol', () => {
+        const input = 'vbscript:msgbox("XSS")';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('msgbox("XSS")');
+      });
+
+      it('should remove data:text/html protocol', () => {
+        const input = 'data:text/html,<script>alert(1)</script>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('alert(1)');
+      });
+
+      it('should handle multiple dangerous protocols', () => {
+        const input = 'javascript:void(0) vbscript:test()';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('javascript:');
+        expect(result).not.toContain('vbscript:');
+      });
+    });
+
+    describe('Special Patterns', () => {
+      it('should remove expression() pattern', () => {
+        const input = 'width: expression(alert(1))';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('expression');
+      });
+
+      it('should remove expression() case-insensitive', () => {
+        const input = 'width: EXPRESSION(alert(1))';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('EXPRESSION');
+      });
+
+      it('should remove @import statement', () => {
+        const input = '@import url("evil.css")';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('@import');
+      });
+
+      it('should handle @import with spaces', () => {
+        const input = '@import   url("test.css")';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('@import');
+      });
+    });
+
+    describe('HTML Entity Encoding', () => {
+      it('should encode < and > when present after sanitization', () => {
+        const input = '<div>Content</div>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('&lt;');
+        expect(result).toContain('&gt;');
+      });
+
+      it('should not double-encode already safe content', () => {
+        const input = 'Normal text without brackets';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('Normal text without brackets');
+      });
+
+      it('should encode remaining tags after script removal', () => {
+        const input = '<script>alert(1)</script><div>Text</div>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('&lt;div&gt;');
+      });
+    });
+
+    describe('Complex Attack Vectors', () => {
+      it('should handle mixed attack vectors', () => {
+        const input = '<script>alert(1)</script><iframe src="evil"></iframe>javascript:void(0)';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('<script');
+        expect(result).not.toContain('<iframe');
+        expect(result).not.toContain('javascript:');
+      });
+
+      it('should handle obfuscated script tags', () => {
+        const input = '<scr<script>ipt>alert(1)</scr</script>ipt>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).not.toContain('alert(1)');
+      });
+
+      it('should handle multiple layers of encoding', () => {
+        const input = '&lt;script&gt;alert(1)&lt;/script&gt;<script>alert(2)</script>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('alert(1)');
+        expect(result).toContain('alert(2)');
+      });
+
+      it('should preserve legitimate content while removing threats', () => {
+        const input = 'Hello <script>alert("XSS")</script> World <b>Bold</b>';
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toContain('Hello');
+        expect(result).toContain('World');
+        expect(result).toContain('alert');
+      });
     });
   });
 
-  describe('sanitizeObject - Special Characters and Edge Cases', () => {
-    it('should handle special characters in strings', () => {
-      const input = { text: '!@#$%^&*()_+-=[]{}|;:,.<>?' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('!@#$%^&*()_+-=[]{}|;:,.<>?');
+  describe('hasDangerousContent() - Conditional Coverage', () => {
+    it('should return true for strings with < character', () => {
+      const result = (interceptor as any).hasDangerousContent('Hello < World');
+      expect(result).toBe(true);
     });
 
-    it('should handle unicode characters', () => {
-      const input = { text: 'Hello 世界 🌍' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('Hello 世界 🌍');
+    it('should return true for strings with > character', () => {
+      const result = (interceptor as any).hasDangerousContent('Hello > World');
+      expect(result).toBe(true);
+    });
+
+    it('should return true for strings with javascript:', () => {
+      const result = (interceptor as any).hasDangerousContent('javascript:alert(1)');
+      expect(result).toBe(true);
+    });
+
+    it('should return true for strings with onerror', () => {
+      const result = (interceptor as any).hasDangerousContent('onerror=alert(1)');
+      expect(result).toBe(true);
+    });
+
+    it('should return true for strings with onclick', () => {
+      const result = (interceptor as any).hasDangerousContent('onclick=malicious()');
+      expect(result).toBe(true);
+    });
+
+    it('should return true for strings with onload', () => {
+      const result = (interceptor as any).hasDangerousContent('onload=evil()');
+      expect(result).toBe(true);
+    });
+
+    it('should return true for case-insensitive matches', () => {
+      const result = (interceptor as any).hasDangerousContent('JAVASCRIPT:alert(1)');
+      expect(result).toBe(true);
+    });
+
+    it('should return false for safe strings', () => {
+      const result = (interceptor as any).hasDangerousContent('Hello World 123');
+      expect(result).toBe(false);
+    });
+
+    it('should return false for empty string', () => {
+      const result = (interceptor as any).hasDangerousContent('');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('cacheResult() - Cache Management', () => {
+    it('should cache strings under 1KB', () => {
+      const original = '<script>test</script>';
+      const sanitized = 'test';
+      (interceptor as any).cacheResult(original, sanitized);
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.get(original)).toBe(sanitized);
+    });
+
+    it('should not cache strings over 1KB', () => {
+      const original = 'a'.repeat(1025);
+      const sanitized = 'a'.repeat(1025);
+      (interceptor as any).cacheResult(original, sanitized);
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.has(original)).toBe(false);
+    });
+
+    it('should implement LRU-like behavior when cache is full', () => {
+      // Fill cache to max size
+      for (let i = 0; i < 1000; i++) {
+        (interceptor as any).cacheResult(`string${i}`, `sanitized${i}`);
+      }
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.size).toBe(1000);
+
+      // Add one more to trigger cleanup
+      (interceptor as any).cacheResult('new_string', 'new_sanitized');
+
+      // Cache should have removed 100 old entries and added the new one
+      expect(cache.size).toBeLessThan(1000);
+      expect(cache.has('new_string')).toBe(true);
+    });
+
+    it('should delete oldest 100 entries when cache is full', () => {
+      // Fill cache
+      for (let i = 0; i < 1000; i++) {
+        (interceptor as any).cacheResult(`string${i}`, `sanitized${i}`);
+      }
+
+      const cache = (interceptor as any).sanitizationCache;
+      const firstKey = cache.keys().next().value;
+
+      // Trigger cleanup
+      (interceptor as any).cacheResult('trigger', 'cleanup');
+
+      // First entries should be removed
+      expect(cache.has('string0')).toBe(false);
+      expect(cache.has('string99')).toBe(false);
+      // Later entries should remain
+      expect(cache.has('string999')).toBe(true);
+    });
+  });
+
+  describe('Cache Utilization - Integration Tests', () => {
+    it('should use cached result for repeated sanitization', () => {
+      const input = '<script>alert("test")</script>';
+
+      // First call - should cache
+      const result1 = (interceptor as any).sanitizeString(input);
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.has(input)).toBe(true);
+
+      // Second call - should use cache
+      const result2 = (interceptor as any).sanitizeString(input);
+
+      expect(result1).toBe(result2);
+      expect(cache.get(input)).toBe(result1);
+    });
+
+    it('should cache safe strings', () => {
+      const input = 'Hello World';
+
+      const result = (interceptor as any).sanitizeString(input);
+      const cache = (interceptor as any).sanitizationCache;
+
+      expect(cache.has(input)).toBe(true);
+      expect(cache.get(input)).toBe(input);
+    });
+
+    it('should handle cache hits for dangerous content', () => {
+      const input = 'javascript:alert(1)';
+
+      // First sanitization
+      (interceptor as any).sanitizeString(input);
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.has(input)).toBe(true);
+
+      // Verify cached result is used
+      const cachedResult = cache.get(input);
+      expect(cachedResult).toBe('alert(1)');
+    });
+  });
+
+  describe('Edge Cases and Boundary Conditions', () => {
+    it('should handle extremely long strings', () => {
+      const longString = 'a'.repeat(10000);
+      const result = (interceptor as any).sanitizeString(longString);
+      expect(result.length).toBe(10000);
+    });
+
+    it('should handle strings with only dangerous characters', () => {
+      const input = '<><><>';
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).toBe('&lt;&gt;&lt;&gt;&lt;&gt;');
+    });
+
+    it('should handle Unicode characters', () => {
+      const input = '你好 <script>alert("XSS")</script> 世界';
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).toContain('你好');
+      expect(result).toContain('世界');
     });
 
     it('should handle emojis', () => {
-      const input = { message: '😀😃😄😁<script>alert()</script>' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.message).toBe('😀😃😄😁');
+      const input = '😀 <script>alert(1)</script> 😎';
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).toContain('😀');
+      expect(result).toContain('😎');
     });
 
-    it('should handle HTML entities', () => {
-      const input = { text: '&lt;script&gt;alert()&lt;/script&gt;' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('&lt;script&gt;alert()&lt;/script&gt;');
+    it('should handle newlines and special characters', () => {
+      const input = 'Line1\nLine2\r\nLine3\tTab';
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).toContain('Line1');
+      expect(result).toContain('Line2');
+      expect(result).toContain('Tab');
     });
 
-    it('should handle newlines and tabs', () => {
-      const input = { text: 'line1\nline2\ttab' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('line1\nline2\ttab');
+    it('should handle null bytes', () => {
+      const input = 'test\x00null';
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).toBeDefined();
     });
 
-    it('should handle very long strings', () => {
-      const longString =
-        'a'.repeat(10000) + '<script>alert()</script>' + 'b'.repeat(10000);
-      const input = { text: longString };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('a'.repeat(10000) + 'b'.repeat(10000));
-    });
-
-    it('should handle strings with only whitespace', () => {
-      const input = { text: '     ' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('');
-    });
-
-    it('should handle strings with only script tags', () => {
-      const input = { text: '<script>alert()</script>' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('');
-    });
-
-    it('should handle malformed script tags', () => {
-      const input = { text: '<script>alert()<script>test' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toContain('test');
-    });
-
-    it('should handle script tags with line breaks', () => {
-      const input = { text: '<script>\nalert()\n</script>hello' };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
+    it('should handle mixed quotes', () => {
+      const input = `<div onclick="alert('XSS')">Text</div>`;
+      const result = (interceptor as any).sanitizeString(input);
+      expect(result).not.toContain('onclick');
     });
   });
 
-  describe('sanitizeObject - Multiple Fields', () => {
-    it('should sanitize all string fields in object', () => {
-      const input = {
-        field1: '<script>1</script>value1',
-        field2: '<script>2</script>value2',
-        field3: '<script>3</script>value3',
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.field1).toBe('value1');
-      expect(result.field2).toBe('value2');
-      expect(result.field3).toBe('value3');
+  describe('Performance and Optimization Tests', () => {
+    it('should handle rapid repeated sanitization efficiently', () => {
+      const input = '<script>alert(1)</script>';
+
+      for (let i = 0; i < 100; i++) {
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBe('alert(1)');
+      }
+
+      // Should only have one cache entry
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.size).toBe(1);
     });
 
-    it('should preserve non-string fields while sanitizing strings', () => {
-      const input = {
-        text: '<script>alert()</script>hello',
-        number: 42,
-        boolean: true,
-        null: null,
-        undefined: undefined,
-      };
-      const result = (interceptor as any).sanitizeObject(input);
-      expect(result.text).toBe('hello');
-      expect(result.number).toBe(42);
-      expect(result.boolean).toBe(true);
-      expect(result.null).toBeNull();
-      expect(result.undefined).toBeUndefined();
-    });
+    it('should handle batch sanitization of different strings', () => {
+      const inputs = [
+        '<script>alert(1)</script>',
+        '<iframe>test</iframe>',
+        'javascript:void(0)',
+        'Safe string',
+        '<div>Content</div>',
+      ];
 
-    it('should handle large objects with many fields', () => {
-      const input: any = {};
-      for (let i = 0; i < 100; i++) {
-        input[`field${i}`] = `<script>alert(${i})</script>value${i}`;
-      }
-      const result = (interceptor as any).sanitizeObject(input);
-      for (let i = 0; i < 100; i++) {
-        expect(result[`field${i}`]).toBe(`value${i}`);
-      }
+      inputs.forEach((input) => {
+        const result = (interceptor as any).sanitizeString(input);
+        expect(result).toBeDefined();
+      });
+
+      const cache = (interceptor as any).sanitizationCache;
+      expect(cache.size).toBe(inputs.length);
     });
   });
 
-  describe('Integration scenarios', () => {
-    it('should handle real-world user registration data', (done) => {
+  describe('Real-world Scenarios', () => {
+    it('should sanitize user registration data', (done) => {
       mockRequest.body = {
-        username: 'john_doe<script>alert()</script>',
+        username: 'john_doe',
         email: 'john@example.com',
-        password: 'securePass123',
-        profile: {
-          bio: 'I am a developer<script>xss</script>',
-          website: 'javascript:alert("xss")',
-        },
+        bio: '<script>alert("XSS")</script>I am a developer',
+        website: 'javascript:alert(1)',
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
           expect(mockRequest.body.username).toBe('john_doe');
           expect(mockRequest.body.email).toBe('john@example.com');
-          expect(mockRequest.body.password).toBe('securePass123');
-          expect(mockRequest.body.profile.bio).toBe('I am a developer');
-          expect(mockRequest.body.profile.website).toBe('alert("xss")');
+          expect(mockRequest.body.bio).toBe('I am a developer');
+          expect(mockRequest.body.website).toBe('alert(1)');
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should handle real-world search query', (done) => {
-      mockRequest.query = {
-        q: 'test search<script>alert()</script>',
-        page: '1',
-        limit: '10',
-        sort: 'name',
+    it('should sanitize chat messages', (done) => {
+      mockRequest.body = {
+        messages: [
+          { text: 'Hello!', sender: 'user1' },
+          { text: '<script>alert("XSS")</script>Hi there', sender: 'user2' },
+          { text: 'How are you?', sender: 'user1' },
+        ],
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.query.q).toBe('test search');
-          expect(mockRequest.query.page).toBe('1');
-          expect(mockRequest.query.limit).toBe('10');
-          expect(mockRequest.query.sort).toBe('name');
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body.messages[0].text).toBe('Hello!');
+          expect(mockRequest.body.messages[1].text).toBe('Hi there');
+          expect(mockRequest.body.messages[2].text).toBe('How are you?');
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should handle real-world comment submission', (done) => {
+    it('should sanitize search queries with filters', (done) => {
+      mockRequest.query = {
+        q: '<script>search term</script>',
+        category: 'books',
+        sort: 'javascript:alert(1)',
+        page: '1',
+      };
+
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.query.q).toBe('search term');
+          expect(mockRequest.query.category).toBe('books');
+          expect(mockRequest.query.sort).toBe('alert(1)');
+          expect(mockRequest.query.page).toBe('1');
+          done();
+        },
+      });
+    });
+
+    it('should sanitize file upload metadata', (done) => {
       mockRequest.body = {
-        content: 'Great article!<script>alert("xss")</script>',
-        author: 'Alice<script>document.cookie</script>',
+        filename: 'document<script>.pdf',
+        description: '<iframe>File description</iframe>',
+        tags: ['tag1', '<script>tag2</script>', 'tag3'],
         metadata: {
-          userAgent: 'Mozilla/5.0...',
-          ipAddress: '192.168.1.1',
+          author: 'John Doe',
+          title: '<script>Title</script>',
         },
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.content).toBe('Great article!');
-          expect(mockRequest.body.author).toBe('Alice');
-          expect(mockRequest.body.metadata.userAgent).toBe('Mozilla/5.0...');
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body.filename).toContain('document');
+          expect(mockRequest.body.description).toBe('File description');
+          expect(mockRequest.body.tags[1]).toBe('tag2');
+          expect(mockRequest.body.metadata.title).toBe('Title');
           done();
         },
-        error: done.fail,
       });
     });
 
-    it('should handle request with both body and query containing XSS', (done) => {
+    it('should handle API request with mixed safe and malicious data', (done) => {
       mockRequest.body = {
-        title: '<script>alert("body")</script>Title',
-        content: 'Content<script>xss</script>',
-      };
-      mockRequest.query = {
-        search: '<script>alert("query")</script>search',
-        filter: 'javascript:void(0)',
-      };
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.title).toBe('Title');
-          expect(mockRequest.body.content).toBe('Content');
-          expect(mockRequest.query.search).toBe('search');
-          expect(mockRequest.query.filter).toBe('void(0)');
-          done();
+        safe: 'This is safe',
+        malicious: '<script>alert("XSS")</script>',
+        nested: {
+          safe: 'Also safe',
+          malicious: 'javascript:void(0)',
         },
-        error: done.fail,
-      });
-    });
-
-    it('should not modify request when no malicious content', (done) => {
-      mockRequest.body = {
-        name: 'John Doe',
-        email: 'john@example.com',
-        message: 'Hello, this is a clean message!',
-      };
-      mockRequest.query = {
-        page: '1',
-        sort: 'date',
+        array: ['safe1', '<iframe>bad</iframe>', 'safe2'],
       };
 
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.name).toBe('John Doe');
-          expect(mockRequest.body.email).toBe('john@example.com');
-          expect(mockRequest.body.message).toBe(
-            'Hello, this is a clean message!',
-          );
-          expect(mockRequest.query.page).toBe('1');
-          expect(mockRequest.query.sort).toBe('date');
+      interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+        complete: () => {
+          expect(mockRequest.body.safe).toBe('This is safe');
+          expect(mockRequest.body.malicious).toContain('alert');
+          expect(mockRequest.body.malicious).not.toContain('<script');
+          expect(mockRequest.body.nested.safe).toBe('Also safe');
+          expect(mockRequest.body.nested.malicious).toBe('void(0)');
+          expect(mockRequest.body.array[0]).toBe('safe1');
+          expect(mockRequest.body.array[1]).toBe('');
+          expect(mockRequest.body.array[2]).toBe('safe2');
           done();
         },
-        error: done.fail,
-      });
-    });
-  });
-
-  describe('Edge cases with different request types', () => {
-    it('should handle request with no body and no query', (done) => {
-      delete mockRequest.body;
-      delete mockRequest.query;
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body).toBeUndefined();
-          expect(mockRequest.query).toBeUndefined();
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle request with body but no query', (done) => {
-      mockRequest.body = { text: '<script>alert()</script>test' };
-      delete mockRequest.query;
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body.text).toBe('test');
-          expect(mockRequest.query).toBeUndefined();
-          done();
-        },
-        error: done.fail,
-      });
-    });
-
-    it('should handle request with query but no body', (done) => {
-      delete mockRequest.body;
-      mockRequest.query = { q: '<script>alert()</script>search' };
-
-      const result$ = interceptor.intercept(
-        mockExecutionContext,
-        mockCallHandler,
-      );
-
-      result$.subscribe({
-        next: () => {
-          expect(mockRequest.body).toBeUndefined();
-          expect(mockRequest.query.q).toBe('search');
-          done();
-        },
-        error: done.fail,
       });
     });
   });

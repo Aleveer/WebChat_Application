@@ -22,6 +22,7 @@ import {
 } from './dto/create-group.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
 import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ResponseUtils } from '../../common/utils/response.utils';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard, RateLimitGuard)
@@ -34,38 +35,25 @@ export class GroupsController {
     const creatorId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.create(createGroupDto, creatorId);
-    return {
-      success: true,
-      message: 'Group created successfully',
-      data: group,
-    };
+    return ResponseUtils.success(group, 'Group created successfully');
   }
 
   @Get()
   async findAll() {
     const groups = await this.groupsService.findAll();
-    return {
-      success: true,
-      data: groups,
-    };
+    return ResponseUtils.success(groups);
   }
 
   @Get('user/:userId')
   async findByUserId(@Param('userId') userId: string) {
     const groups = await this.groupsService.findByUserId(userId);
-    return {
-      success: true,
-      data: groups,
-    };
+    return ResponseUtils.success(groups);
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const group = await this.groupsService.findOne(id);
-    return {
-      success: true,
-      data: group,
-    };
+    return ResponseUtils.success(group);
   }
 
   @Get(':id/members')
@@ -73,10 +61,7 @@ export class GroupsController {
     const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.getGroupMembers(id, userId);
-    return {
-      success: true,
-      data: group,
-    };
+    return ResponseUtils.success(group);
   }
 
   @Patch(':id')
@@ -88,11 +73,7 @@ export class GroupsController {
     const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.update(id, updateGroupDto, userId);
-    return {
-      success: true,
-      message: 'Group updated successfully',
-      data: group,
-    };
+    return ResponseUtils.success(group, 'Group updated successfully');
   }
 
   @Delete(':id')
@@ -101,10 +82,7 @@ export class GroupsController {
     const userId = req.user?.sub || req.user?._id;
 
     await this.groupsService.remove(id, userId);
-    return {
-      success: true,
-      message: 'Group deleted successfully',
-    };
+    return ResponseUtils.success(null, 'Group deleted successfully');
   }
 
   @Post(':id/members')
@@ -117,11 +95,7 @@ export class GroupsController {
     const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.addMember(id, addMemberDto, userId);
-    return {
-      success: true,
-      message: 'Member added successfully',
-      data: group,
-    };
+    return ResponseUtils.success(group, 'Member added successfully');
   }
 
   @Delete(':id/members')
@@ -138,11 +112,7 @@ export class GroupsController {
       removeMemberDto,
       userId,
     );
-    return {
-      success: true,
-      message: 'Member removed successfully',
-      data: group,
-    };
+    return ResponseUtils.success(group, 'Member removed successfully');
   }
 
   @Patch(':id/admin')
@@ -155,10 +125,6 @@ export class GroupsController {
     const userId = req.user?.sub || req.user?._id;
 
     const group = await this.groupsService.setAdmin(id, setAdminDto, userId);
-    return {
-      success: true,
-      message: 'Admin status updated successfully',
-      data: group,
-    };
+    return ResponseUtils.success(group, 'Admin status updated successfully');
   }
 }

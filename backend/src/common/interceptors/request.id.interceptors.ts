@@ -30,7 +30,7 @@ export class RequestIdInterceptor implements NestInterceptor {
     // Add request ID to request object
     request.requestId = requestId;
 
-    // FIXED: Create request context map for correlation ID propagation
+    // Create request context map for correlation ID propagation
     const contextMap = new Map<string, any>();
     contextMap.set('requestId', requestId);
     contextMap.set('userId', request.user?.id || 'anonymous');
@@ -41,27 +41,33 @@ export class RequestIdInterceptor implements NestInterceptor {
     // Run the entire request handler within the async context
     return new Observable((subscriber) => {
       requestContext.run(contextMap, () => {
-        next.handle().pipe(
-          tap({
-            next: (data) => {
-              // Add request ID to response headers
-              const response = context.switchToHttp().getResponse<Response>();
-              response.setHeader('X-Request-ID', requestId);
-              response.setHeader('X-Correlation-ID', requestId);
-            },
-            error: (error) => {
-              // Add correlation ID to error logs
-              this.logger.error(
-                `Request ${requestId} failed: ${error.message}`,
-                error.stack,
-              );
-            },
-            complete: () => {
-              const duration = Date.now() - (contextMap.get('startTime') || Date.now());
-              this.logger.debug(`Request ${requestId} completed in ${duration}ms`);
-            },
-          }),
-        ).subscribe(subscriber);
+        next
+          .handle()
+          .pipe(
+            tap({
+              next: (data) => {
+                // Add request ID to response headers
+                const response = context.switchToHttp().getResponse<Response>();
+                response.setHeader('X-Request-ID', requestId);
+                response.setHeader('X-Correlation-ID', requestId);
+              },
+              error: (error) => {
+                // Add correlation ID to error logs
+                this.logger.error(
+                  `Request ${requestId} failed: ${error.message}`,
+                  error.stack,
+                );
+              },
+              complete: () => {
+                const duration =
+                  Date.now() - (contextMap.get('startTime') || Date.now());
+                this.logger.debug(
+                  `Request ${requestId} completed in ${duration}ms`,
+                );
+              },
+            }),
+          )
+          .subscribe(subscriber);
       });
     });
   }

@@ -12,7 +12,6 @@ import { Request } from 'express';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 
-// Cache Interceptor with native NestJS cache
 @Injectable()
 export class CacheInterceptor implements NestInterceptor {
   private readonly logger = new Logger(CacheInterceptor.name);
@@ -28,7 +27,7 @@ export class CacheInterceptor implements NestInterceptor {
 
     // Check cache first
     const cached = await this.getFromCache(cacheKey);
-    if (cached) {
+    if (cached !== null && cached !== undefined) {
       return new Observable((observer) => {
         observer.next(cached);
         observer.complete();

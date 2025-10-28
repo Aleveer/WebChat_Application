@@ -11,7 +11,6 @@ import { Observable, timeout, catchError, TimeoutError } from 'rxjs';
 import type { InterceptorConfig } from '../config/interceptor.config';
 import { DEFAULT_INTERCEPTOR_CONFIG } from '../config/interceptor.config';
 
-// Timeout Interceptor
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
   private readonly timeoutMs: number;

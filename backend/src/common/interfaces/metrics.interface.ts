@@ -3,10 +3,8 @@ export interface IMetricsService {
   decrementCounter(name: string, value?: number): void;
   getCounter(name: string): number;
   getAllCounters(): Record<string, number>;
-  
   startTimer(name: string): void;
   endTimer(name: string): number;
-  
   recordHistogram(name: string, value: number): void;
   getHistogramStats(name: string): {
     count: number;
@@ -18,7 +16,6 @@ export interface IMetricsService {
     p99: number;
   } | null;
   getAllHistograms(): Record<string, any>;
-  
   reset(): void;
   getSummary(): {
     counters: Record<string, number>;

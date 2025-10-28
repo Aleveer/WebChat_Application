@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import * as bcrypt from 'bcrypt';
 import { APP_CONSTANTS } from '../../../common/constants/app.constants';
+import { PasswordUtils } from '../../../common/utils/password.utils';
 export type UserDocument = User & Document;
 
 @Schema({ timestamps: true })
@@ -59,7 +59,7 @@ export class User {
 
   // Method to compare password
   async comparePassword(candidatePassword: string): Promise<boolean> {
-    return bcrypt.compare(candidatePassword, this.password);
+    return PasswordUtils.comparePassword(candidatePassword, this.password);
   }
 }
 
@@ -80,8 +80,7 @@ UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
+    this.password = await PasswordUtils.hashPassword(this.password);
     next();
   } catch (error) {
     next(error);

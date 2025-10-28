@@ -1,4 +1,3 @@
-// Validation Error DTO
 export class ValidationErrorDto {
   field: string;
   message: string;

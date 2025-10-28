@@ -1,17 +1,17 @@
 export const appConfig = () => ({
   app: {
-    port: parseInt(process.env.PORT || '3000', 10),
-    environment: process.env.NODE_ENV || 'development',
+    port: parseInt(process.env.PORT, 10),
+    environment: process.env.NODE_ENV,
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: process.env.FRONTEND_URL,
       credentials: true,
     },
     rateLimit: {
-      ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10), // 60 seconds
-      limit: parseInt(process.env.RATE_LIMIT_LIMIT || '100', 10), // 100 requests per minute
+      ttl: parseInt(process.env.RATE_LIMIT_TTL, 10), // 60 seconds
+      limit: parseInt(process.env.RATE_LIMIT_LIMIT, 10), // 100 requests per minute
     },
     file: {
-      maxSize: parseInt(process.env.FILE_MAX_SIZE || '10485760', 10), // 10MB
+      maxSize: parseInt(process.env.FILE_MAX_SIZE, 10), // 10MB
       allowedMimes: [
         'image/jpeg',
         'image/png',
@@ -22,11 +22,11 @@ export const appConfig = () => ({
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       ],
-      uploadPath: process.env.UPLOAD_PATH || 'uploads',
+      uploadPath: process.env.UPLOAD_PATH,
     },
     email: {
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT || '587', 10),
+      host: process.env.EMAIL_HOST,
+      port: parseInt(process.env.EMAIL_PORT, 10),
       secure: process.env.EMAIL_SECURE === 'true',
       auth: {
         user: process.env.EMAIL_USER,

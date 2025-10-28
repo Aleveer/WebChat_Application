@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { ErrorCode } from '../constants/error-codes.constants';
+import { ErrorCode } from '../constants/app.constants';
 
 /**
  * Standardized Error Response Interface

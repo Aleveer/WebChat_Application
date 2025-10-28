@@ -5,10 +5,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import {
-  ErrorCode,
-  getErrorCodeFromStatus,
-} from '../constants/error-codes.constants';
+import { ErrorCode, getErrorCodeFromStatus } from '../constants/app.constants';
 import {
   ErrorResponse,
   ErrorResponseFormatter,
@@ -21,7 +18,6 @@ export abstract class BaseExceptionFilter implements ExceptionFilter {
 
   /**
    * Get error code from HTTP status
-   * DEPRECATED: Use getErrorCodeFromStatus from error-codes.constants instead
    */
   protected getErrorCode(status: number): string {
     return getErrorCodeFromStatus(status);

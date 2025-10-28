@@ -60,7 +60,7 @@ export class GroupsService {
       .find()
       .populate(
         'members.user_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .exec();
   }
@@ -70,7 +70,7 @@ export class GroupsService {
       .findById(id)
       .populate(
         'members.user_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .exec();
 
@@ -88,7 +88,7 @@ export class GroupsService {
       })
       .populate(
         'members.user_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .exec();
   }
@@ -113,7 +113,7 @@ export class GroupsService {
       .findByIdAndUpdate(id, updateGroupDto, { new: true, runValidators: true })
       .populate(
         'members.user_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .exec();
 

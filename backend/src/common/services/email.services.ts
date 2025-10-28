@@ -11,10 +11,10 @@ export class EmailService {
   constructor(private configService: ConfigService) {
     // Initialize circuit breaker for email service
     this.circuitBreaker = new CircuitBreaker('email-service', {
-      failureThreshold: 3,      // Open after 3 failures
-      successThreshold: 2,      // Close after 2 successes
-      timeout: 30000,           // Try again after 30 seconds
-      monitoringPeriod: 60000,  // Reset failure count after 1 minute
+      failureThreshold: 3, // Open after 3 failures
+      successThreshold: 2, // Close after 2 successes
+      timeout: 30000, // Try again after 30 seconds
+      monitoringPeriod: 60000, // Reset failure count after 1 minute
     });
   }
 
@@ -23,7 +23,7 @@ export class EmailService {
     subject: string,
     content: string,
   ): Promise<boolean> {
-    // FIXED: Use circuit breaker with fallback
+    // Use circuit breaker with fallback
     return this.circuitBreaker.executeWithFallback(
       async () => {
         // Actual email sending logic
@@ -39,19 +39,29 @@ export class EmailService {
 
         // TODO: Implement real email service (Nodemailer, SendGrid, etc.)
         // Mock implementation - replace with actual email sending
-        this.logger.log(`Email sent to ${to}: ${subject}`);
-        this.logger.debug(`Email content: ${content}`);
+        // LOGGING FIX: Add structured logging with context
+        this.logger.log({
+          message: 'Email sent successfully',
+          to,
+          subject,
+          timestamp: new Date().toISOString(),
+          service: 'email',
+        });
 
         return true;
       },
       // Fallback: Log email instead of sending (graceful degradation)
       async () => {
-        this.logger.warn(
-          `Email service unavailable. Email to ${to} logged instead of sent`,
-        );
-        this.logger.warn(`Subject: ${subject}`);
-        this.logger.debug(`Content: ${content}`);
-        
+        // LOGGING FIX: Structured error logging
+        this.logger.warn({
+          message: 'Email service unavailable - using fallback',
+          to,
+          subject,
+          timestamp: new Date().toISOString(),
+          service: 'email',
+          fallback: true,
+        });
+
         // Return false to indicate fallback was used
         return false;
       },

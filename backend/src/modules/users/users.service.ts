@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -10,6 +11,11 @@ import { User, UserDocument } from './schemas/user.schema';
 import { CreateUserDto, UpdateUserDto, LoginDto } from './dto/create-users.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { EventType } from '../analytics/schemas/analytics-event.schema';
+import {
+  createSafeRegex,
+  sanitizePhoneNumber,
+  sanitizeObjectId,
+} from '../../common/utils/sanitization.utils';
 
 @Injectable()
 export class UsersService {
@@ -44,17 +50,42 @@ export class UsersService {
   }
 
   async findOne(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).select('-password').exec();
+    // Validate and sanitize ObjectId
+    const sanitizedId = sanitizeObjectId(id);
+    if (!sanitizedId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    const user = await this.userModel
+      .findById(sanitizedId)
+      .select('-password')
+      .exec();
     if (!user) {
       throw new NotFoundException('User not found');
     }
     return user;
   }
 
-  async findByPhoneNumber(phoneNumber: string): Promise<User> {
+  async findByPhoneNumber(phoneNumber: string): Promise<User | null> {
+    // Sanitize phone number to prevent injection
+    const sanitizedPhone = sanitizePhoneNumber(phoneNumber);
+    if (!sanitizedPhone) {
+      return null; // Return null for invalid format (consistent with findByUsername)
+    }
+
     const user = await this.userModel
-      .findOne({ phone_number: phoneNumber })
+      .findOne({ phone_number: sanitizedPhone })
       .exec();
+
+    return user;
+  }
+
+  /**
+   * Find user by phone number (throws exception if not found)
+   * Use this for operations that require user to exist
+   */
+  async findByPhoneNumberOrFail(phoneNumber: string): Promise<User> {
+    const user = await this.findByPhoneNumber(phoneNumber);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -70,8 +101,17 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    // Validate and sanitize ObjectId
+    const sanitizedId = sanitizeObjectId(id);
+    if (!sanitizedId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
     const user = await this.userModel
-      .findByIdAndUpdate(id, updateUserDto, { new: true, runValidators: true })
+      .findByIdAndUpdate(sanitizedId, updateUserDto, {
+        new: true,
+        runValidators: true,
+      })
       .select('-password')
       .exec();
 
@@ -82,7 +122,7 @@ export class UsersService {
     // Track profile update
     await this.analyticsService.trackEvent({
       event_type: 'profile_updated' as EventType,
-      user_id: id,
+      user_id: sanitizedId,
       metadata: { updated_fields: Object.keys(updateUserDto) },
     });
 
@@ -90,16 +130,28 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
-    const result = await this.userModel.findByIdAndDelete(id).exec();
+    // Validate and sanitize ObjectId
+    const sanitizedId = sanitizeObjectId(id);
+    if (!sanitizedId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    const result = await this.userModel.findByIdAndDelete(sanitizedId).exec();
     if (!result) {
       throw new NotFoundException('User not found');
     }
   }
 
   async login(loginDto: LoginDto): Promise<{ user: User; message: string }> {
+    // Sanitize phone number to prevent injection
+    const sanitizedPhone = sanitizePhoneNumber(loginDto.phone_number);
+    if (!sanitizedPhone) {
+      throw new BadRequestException('Invalid phone number format');
+    }
+
     const user = await this.userModel
       .findOne({
-        phone_number: loginDto.phone_number,
+        phone_number: sanitizedPhone,
       })
       .exec();
 
@@ -129,14 +181,16 @@ export class UsersService {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    const searchRegex = new RegExp(query, 'i');
+    // Use safe regex to prevent ReDoS and injection
+    const safeRegex = createSafeRegex(query);
+
     return this.userModel
       .find({
         $or: [
-          { full_name: searchRegex },
-          { username: searchRegex },
-          { phone_number: searchRegex },
-          { email: searchRegex },
+          { full_name: safeRegex },
+          { username: safeRegex },
+          { phone_number: safeRegex },
+          { email: safeRegex },
         ],
       })
       .select('-password')
@@ -145,10 +199,16 @@ export class UsersService {
   }
 
   async getUserContacts(userId: string): Promise<User[]> {
+    // Validate and sanitize ObjectId
+    const sanitizedId = sanitizeObjectId(userId);
+    if (!sanitizedId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
     // This would typically involve getting users from groups or direct messages
     // For now, return all users except the current user
     return this.userModel
-      .find({ _id: { $ne: userId } })
+      .find({ _id: { $ne: sanitizedId } })
       .select('-password')
       .exec();
   }

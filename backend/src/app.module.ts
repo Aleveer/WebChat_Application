@@ -19,8 +19,6 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ChatModule } from './modules/chat/chat.module';
 
 // Guards, Interceptors, Filters
-import { JwtAuthGuard } from './common/guards/jwt.auth.guard';
-import { RateLimitGuard } from './common/guards/ratelimit.guards';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptors';
 import { ResponseTransformInterceptor } from './common/interceptors/response.transform.interceptors';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
@@ -40,7 +38,7 @@ import { appConfig } from './config/app.config';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, jwtConfig, appConfig],
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['.env.development', '.env', '.env.production'],
     }),
 
     // Database
@@ -60,14 +58,18 @@ import { appConfig } from './config/app.config';
     // JWT
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn'),
-        },
-      }),
+      global: true,
+      useFactory: (configService: ConfigService) => {
+        const expiresIn = configService.get<string>('jwt.expiresIn') || '24h';
+        return {
+          secret: configService.get<string>('jwt.secret'),
+          signOptions: {
+            expiresIn: expiresIn as any, // JWT library accepts string durations like '24h', '7d', etc.
+          },
+        };
+      },
       inject: [ConfigService],
-    } as any),
+    }),
 
     // Rate Limiting
     ThrottlerModule.forRootAsync({
@@ -86,15 +88,19 @@ import { appConfig } from './config/app.config';
     // Scheduling
     ScheduleModule.forRoot(),
 
-    // Cache Manager - Native in-memory cache
+    // Cache Manager - Native in-memory cache. Make cache settings configurable
     CacheModule.register({
       isGlobal: true,
-      ttl: 3600000, // 1 hour in milliseconds
-      max: 100, // Maximum number of items in cache
+      ttl: parseInt(process.env.CACHE_TTL, 10) || 3600000, // 1 hour default
+      max: parseInt(process.env.CACHE_MAX_ITEMS, 10) || 100,
     }),
 
-    // Application modules
-    CommonModule,
+    // Application modules. Enable guards in CommonModule (single registration point)
+    CommonModule.forRoot({
+      enableGlobalGuards: true,
+      enableGlobalFilters: false, // Filters registered in AppModule
+      enableGlobalInterceptors: false, // Interceptors registered in AppModule
+    }),
     AuthModule,
     UsersModule,
     GroupsModule,
@@ -106,17 +112,11 @@ import { appConfig } from './config/app.config';
   ],
   controllers: [MetricsController],
   providers: [
-    // Global guards
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RateLimitGuard,
-    },
+    // Removed duplicate guard registrations
+    // Guards are now registered only in CommonModule to avoid double execution
+    // JwtAuthGuard and RateLimitGuard are configured in CommonModule.forRoot()
 
-    // Global interceptors
+    // Global interceptors (specific to AppModule)
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

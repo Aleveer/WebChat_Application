@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { BaseExceptionFilter } from './base.exception.filters';
-import { ErrorCode } from '../constants/error-codes.constants';
+import { ErrorCode } from '../constants/app.constants';
 
 @Catch(HttpException)
 export class HttpExceptionFilter extends BaseExceptionFilter {

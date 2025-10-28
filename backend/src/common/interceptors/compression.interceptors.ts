@@ -7,7 +7,6 @@ import {
 import { Observable } from 'rxjs';
 import { Response } from 'express';
 
-// Compression Interceptor
 @Injectable()
 export class CompressionInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {

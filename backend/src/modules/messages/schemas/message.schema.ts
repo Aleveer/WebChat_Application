@@ -61,14 +61,20 @@ MessageSchema.set('toJSON', {
   virtuals: true,
 });
 
-// Indexes for faster queries
-MessageSchema.index({ sender_id: 1, timestamp: -1 });
+// PERFORMANCE: Comprehensive indexing strategy for common queries
+// 1. Compound index for message retrieval by receiver with time ordering
 MessageSchema.index({ receiver_type: 1, receiver_id: 1, timestamp: -1 });
-MessageSchema.index({ timestamp: -1 });
 
-// Compound index for efficient message retrieval
+// 2. Index for sender's sent messages
+MessageSchema.index({ sender_id: 1, timestamp: -1 });
+
+// 3. Index for direct message conversations (bidirectional)
 MessageSchema.index({
-  receiver_type: 1,
+  sender_id: 1,
   receiver_id: 1,
+  receiver_type: 1,
   timestamp: -1,
 });
+
+// 4. Standalone timestamp index for cleanup/archival operations
+MessageSchema.index({ timestamp: -1 });

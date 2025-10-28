@@ -109,6 +109,19 @@ GroupSchema.set('toJSON', {
   virtuals: true,
 });
 
-// Index for faster queries
-GroupSchema.index({ 'members.user_id': 1 });
+// PERFORMANCE: Comprehensive indexing strategy
+// 1. Index for finding groups by user membership
+GroupSchema.index({ 'members.user_id': 1, 'members.removed_at': 1 });
+
+// 2. Index for group creation time
 GroupSchema.index({ created_at: -1 });
+
+// 3. Compound index for active member queries
+GroupSchema.index({
+  'members.user_id': 1,
+  'members.is_admin': 1,
+  'members.removed_at': 1,
+});
+
+// 4. Text index for group name search
+GroupSchema.index({ name: 'text' });

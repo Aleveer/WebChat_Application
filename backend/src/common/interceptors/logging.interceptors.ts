@@ -10,7 +10,6 @@ import { tap, map, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { Request, Response } from 'express';
 
-// Logging Interceptor
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(LoggingInterceptor.name);

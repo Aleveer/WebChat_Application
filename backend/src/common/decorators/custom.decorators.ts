@@ -1,6 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 import { APP_CONSTANTS } from '../constants/app.constants';
+import { UserDocument } from '../types';
 import '../types/express.d';
 
 //TODO: Write test-cases for decorators file
@@ -12,31 +13,20 @@ export const CurrentUser = createParamDecorator(
   },
 );
 
-// Define consistent User type based on express.d.ts
-interface UserDocument {
-  id?: string;
-  _id?: { toString: () => string } | string;
-  email?: string;
-  username?: string;
-  roles?: string[];
-}
-
 // Get user ID from request
 export const CurrentUserId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): string | undefined => {
     const request = ctx.switchToHttp().getRequest<Request>();
     const user = request.user as UserDocument | undefined;
-    
+
     if (!user) return undefined;
 
     // Handle both MongoDB ObjectId and string ID
     if (user.id) return user.id;
     if (user._id) {
-      return typeof user._id === 'string' 
-        ? user._id 
-        : user._id.toString();
+      return typeof user._id === 'string' ? user._id : user._id.toString();
     }
-    
+
     return undefined;
   },
 );
@@ -74,8 +64,12 @@ export const Pagination = createParamDecorator(
     sortOrder: 'asc' | 'desc';
   } => {
     const request = ctx.switchToHttp().getRequest<Request>();
-    const page = parseInt(request.query.page as string) || APP_CONSTANTS.PAGINATION.DEFAULT_PAGE;
-    const limit = parseInt(request.query.limit as string) || APP_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
+    const page =
+      parseInt(request.query.page as string) ||
+      APP_CONSTANTS.PAGINATION.DEFAULT_PAGE;
+    const limit =
+      parseInt(request.query.limit as string) ||
+      APP_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const sortBy = request.query.sortBy as string;
     const sortOrder = (request.query.sortOrder as 'asc' | 'desc') || 'desc';
 
@@ -87,12 +81,11 @@ export const Pagination = createParamDecorator(
       'updatedAt',
       'name',
       'email',
-      'fullname',
+      'full_name',
     ];
-    
-    const validatedSortBy = sortBy && allowedSortFields.includes(sortBy)
-      ? sortBy
-      : 'created_at';
+
+    const validatedSortBy =
+      sortBy && allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
 
     return {
       page: Math.max(APP_CONSTANTS.PAGINATION.DEFAULT_PAGE, page),

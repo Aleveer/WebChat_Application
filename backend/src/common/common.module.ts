@@ -17,21 +17,12 @@
 import { Module, DynamicModule, Provider } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
-import type {
-  CommonModuleOptions,
-} from './config/common-module.config';
+import type { CommonModuleOptions } from './config/common-module.config';
 import { DEFAULT_COMMON_MODULE_OPTIONS } from './config/common-module.config';
 
-// ============================================================================
-// CONTROLLERS
-// ============================================================================
-// Import controllers
 import { MetricsController } from './controllers/metrics.controller';
 import { HealthController } from './controllers/health.controller';
 
-// ============================================================================
-// SERVICES
-// ============================================================================
 import { CacheService } from './services/cache.services';
 import { EmailService } from './services/email.services';
 import { NotificationService } from './services/notification.services';
@@ -40,9 +31,6 @@ import { AnalyticsService } from './services/analytic.services';
 import { HealthCheckService } from './services/healthcheck.services';
 import { MetricsService } from './services/metrics.services';
 
-// ============================================================================
-// GUARDS
-// ============================================================================
 import { AuthGuard } from './guards/auth.guards';
 import { ApiKeyGuard } from './guards/apikey.guards';
 import { RolesGuard } from './guards/roles.guards';
@@ -54,9 +42,6 @@ import { GroupAdminGuard } from './guards/group.admin.guards';
 import { GroupMemberGuard } from './guards/group.member.guards';
 import { MessageOwnerGuard } from './guards/message.owner.guards';
 
-// ============================================================================
-// INTERCEPTORS
-// ============================================================================
 import { SanitizationInterceptor } from './interceptors/sanitization.interceptors';
 import { LoggingInterceptor } from './interceptors/logging.interceptors';
 import { PerformanceInterceptor } from './interceptors/performance.interceptors';
@@ -69,9 +54,6 @@ import { CompressionInterceptor } from './interceptors/compression.interceptors'
 import { SecurityHeadersInterceptor } from './interceptors/security.headers.interceptors';
 import { RateLimitInterceptor } from './interceptors/ratelimit.interceptors';
 
-// ============================================================================
-// FILTERS
-// ============================================================================
 import { GlobalExceptionFilter } from './filters/global.exception.filters';
 import { HttpExceptionFilter } from './filters/http.exception.filters';
 import { DatabaseExceptionFilter } from './filters/database.exception.filters';
@@ -84,27 +66,22 @@ import { ValidationExceptionFilter } from './filters/validationexception.filters
 export class CommonModule {
   /**
    * Configure CommonModule with custom options
-   * FIXED: Now supports opt-in/out of global interceptors and filters
    *
    * @param options Configuration options
    * @returns Configured module
    *
    * @example
-   * // Enable all features (default)
    * CommonModule.forRoot()
    *
    * @example
-   * // Disable global interceptors
    * CommonModule.forRoot({ enableGlobalInterceptors: false })
    *
    * @example
-   * // Enable only specific interceptors
    * CommonModule.forRoot({
    *   interceptors: {
    *     logging: true,
    *     metrics: true,
    *     requestId: true,
-   *     // Others disabled by default
    *   }
    * })
    */
@@ -112,9 +89,6 @@ export class CommonModule {
     const config = { ...DEFAULT_COMMON_MODULE_OPTIONS, ...options };
 
     const providers: Provider[] = [
-      // ========================================================================
-      // SERVICES - Always available
-      // ========================================================================
       CacheService,
       EmailService,
       NotificationService,
@@ -123,9 +97,6 @@ export class CommonModule {
       HealthCheckService,
       MetricsService,
 
-      // ========================================================================
-      // GUARDS - Always available (apply manually in controllers)
-      // ========================================================================
       AuthGuard,
       ApiKeyGuard,
       RolesGuard,
@@ -137,9 +108,6 @@ export class CommonModule {
       GroupMemberGuard,
       MessageOwnerGuard,
 
-      // ========================================================================
-      // INTERCEPTORS - Always available (apply manually or globally)
-      // ========================================================================
       SanitizationInterceptor,
       LoggingInterceptor,
       PerformanceInterceptor,
@@ -152,9 +120,6 @@ export class CommonModule {
       SecurityHeadersInterceptor,
       RateLimitInterceptor,
 
-      // ========================================================================
-      // FILTERS - Always available (apply manually or globally)
-      // ========================================================================
       GlobalExceptionFilter,
       HttpExceptionFilter,
       DatabaseExceptionFilter,
@@ -164,9 +129,6 @@ export class CommonModule {
       ValidationExceptionFilter,
     ];
 
-    // ========================================================================
-    // CONDITIONALLY ADD GLOBAL INTERCEPTORS
-    // ========================================================================
     if (config.enableGlobalInterceptors) {
       if (config.interceptors?.requestId !== false) {
         providers.push({
@@ -211,9 +173,6 @@ export class CommonModule {
       }
     }
 
-    // ========================================================================
-    // CONDITIONALLY ADD GLOBAL GUARDS
-    // ========================================================================
     if (config.enableGlobalGuards) {
       providers.push({
         provide: APP_GUARD,
@@ -221,9 +180,6 @@ export class CommonModule {
       });
     }
 
-    // ========================================================================
-    // CONDITIONALLY ADD GLOBAL FILTERS
-    // ========================================================================
     if (config.enableGlobalFilters) {
       providers.push({
         provide: APP_FILTER,
@@ -237,8 +193,6 @@ export class CommonModule {
       controllers: [MetricsController, HealthController],
       providers,
       exports: [
-        // Export all services, guards, interceptors, and filters
-        // so other modules can use them
         CacheService,
         EmailService,
         NotificationService,

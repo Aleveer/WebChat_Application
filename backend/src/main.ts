@@ -4,11 +4,14 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import compression from 'compression';
-import { APP_CONSTANTS } from './common/constants/app.constants';
+import { validateEnvironment } from './common/utils/env-validation.utils';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
+    // CRITICAL: Validate environment variables before starting
+    validateEnvironment();
+
     const app = await NestFactory.create(AppModule);
 
     // Security middleware
@@ -39,7 +42,7 @@ async function bootstrap() {
         'JWT-auth',
       )
       .addServer('http://localhost:3000', 'Development server')
-      .addServer('https://api.yourdomain.com', 'Production server')
+      //.addServer('https://api.yourdomain.com', 'Production server')
       .addTag('Health', 'Health check endpoints')
       .addTag('Auth', 'Authentication endpoints')
       .addTag('Users', 'User management endpoints')

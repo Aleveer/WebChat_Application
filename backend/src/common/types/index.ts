@@ -1,18 +1,51 @@
 import { Request } from 'express';
 
-// Common types
+// ============================================================================
+// UNIFIED USER TYPE - Based on MongoDB Schema
+// ============================================================================
+/**
+ * User interface matching MongoDB schema
+ * This is the primary User type used throughout the application
+ */
 export interface User {
-  id: string;
-  _id: string;
-  phone_number: string;
-  fullname: string;
+  id: string; // String representation of _id
+  _id: string; // MongoDB ObjectId as string
+  phone_number: string; // Unique phone number
+  full_name: string; // User's full name
+  username?: string; // Optional unique username
+  email?: string; // Optional unique email
+  profile_photo?: string; // Optional profile photo URL
+  password?: string; // Hashed password (should not be exposed in responses)
+  role?: string; // User role (user, admin)
+  permissions?: string[]; // User permissions
+  groups?: string[]; // Group IDs user belongs to
+  adminGroups?: string[]; // Group IDs where user is admin
+  created_at?: Date; // Account creation timestamp
+  updated_at?: Date; // Last update timestamp
+}
+
+/**
+ * User Document type for MongoDB operations
+ * Handles both ObjectId and string _id
+ * Used in decorators and guards where _id might be ObjectId
+ */
+export interface UserDocument {
+  id?: string;
+  _id?: { toString: () => string } | string;
+  phone_number?: string;
+  full_name?: string;
   username?: string;
   email?: string;
+  profile_photo?: string;
   role?: string;
   permissions?: string[];
   groups?: string[];
   adminGroups?: string[];
 }
+
+// ============================================================================
+// OTHER COMMON TYPES
+// ============================================================================
 
 export interface PaginationMeta {
   page: number;

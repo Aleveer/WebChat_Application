@@ -18,6 +18,8 @@ import {
   SendToGroupDto,
 } from './dto/create-message.dto';
 import { GroupsService } from '../groups/groups.service';
+import { sanitizeObjectId } from '../../common/utils/sanitization.utils';
+import { APP_CONSTANTS } from '../../common/constants/app.constants';
 
 @Injectable()
 export class MessagesService {
@@ -27,10 +29,18 @@ export class MessagesService {
   ) {}
 
   async create(createMessageDto: CreateMessageDto): Promise<Message> {
+    // Validate and sanitize ObjectIds
+    const sanitizedSenderId = sanitizeObjectId(createMessageDto.sender_id);
+    const sanitizedReceiverId = sanitizeObjectId(createMessageDto.receiver_id);
+
+    if (!sanitizedSenderId || !sanitizedReceiverId) {
+      throw new BadRequestException('Invalid sender or receiver ID format');
+    }
+
     const message = new this.messageModel({
       ...createMessageDto,
-      sender_id: new Types.ObjectId(createMessageDto.sender_id),
-      receiver_id: new Types.ObjectId(createMessageDto.receiver_id),
+      sender_id: new Types.ObjectId(sanitizedSenderId),
+      receiver_id: new Types.ObjectId(sanitizedReceiverId),
       timestamp: new Date(),
     });
 
@@ -41,10 +51,18 @@ export class MessagesService {
     sendToUserDto: SendToUserDto,
     senderId: string,
   ): Promise<Message> {
+    // Validate and sanitize ObjectIds
+    const sanitizedSenderId = sanitizeObjectId(senderId);
+    const sanitizedReceiverId = sanitizeObjectId(sendToUserDto.receiver_id);
+
+    if (!sanitizedSenderId || !sanitizedReceiverId) {
+      throw new BadRequestException('Invalid sender or receiver ID format');
+    }
+
     const messageData = {
-      sender_id: senderId,
+      sender_id: sanitizedSenderId,
       receiver_type: ReceiverType.USER,
-      receiver_id: sendToUserDto.receiver_id,
+      receiver_id: sanitizedReceiverId,
       text: sendToUserDto.text,
       timestamp: new Date(),
     };
@@ -57,16 +75,24 @@ export class MessagesService {
     sendToGroupDto: SendToGroupDto,
     senderId: string,
   ): Promise<Message> {
+    // Validate and sanitize ObjectIds
+    const sanitizedSenderId = sanitizeObjectId(senderId);
+    const sanitizedGroupId = sanitizeObjectId(sendToGroupDto.group_id);
+
+    if (!sanitizedSenderId || !sanitizedGroupId) {
+      throw new BadRequestException('Invalid sender or group ID format');
+    }
+
     // Verify sender is a member of the group
-    const group = await this.groupsService.findOne(sendToGroupDto.group_id);
-    if (!group.isMember(new Types.ObjectId(senderId))) {
+    const group = await this.groupsService.findOne(sanitizedGroupId);
+    if (!group.isMember(new Types.ObjectId(sanitizedSenderId))) {
       throw new ForbiddenException('You are not a member of this group');
     }
 
     const messageData = {
-      sender_id: senderId,
+      sender_id: sanitizedSenderId,
       receiver_type: ReceiverType.GROUP,
-      receiver_id: sendToGroupDto.group_id,
+      receiver_id: sanitizedGroupId,
       text: sendToGroupDto.text,
       timestamp: new Date(),
     };
@@ -81,9 +107,21 @@ export class MessagesService {
   ): Promise<Message[]> {
     const { receiver_id, receiver_type, before, limit = 50 } = getMessagesDto;
 
+    // Validate and sanitize ObjectIds
+    const sanitizedReceiverId = sanitizeObjectId(receiver_id);
+    const sanitizedUserId = sanitizeObjectId(userId);
+
+    if (!sanitizedReceiverId || !sanitizedUserId) {
+      throw new BadRequestException('Invalid receiver or user ID format');
+    }
+
+    // Validate and cap limit to prevent abuse
+    const maxLimit = APP_CONSTANTS.MESSAGES.DEFAULT_MESSAGE_LIMIT;
+    const safeLimit = Math.min(Math.max(1, limit), maxLimit);
+
     const query: Record<string, unknown> = {
       receiver_type,
-      receiver_id: new Types.ObjectId(receiver_id),
+      receiver_id: new Types.ObjectId(sanitizedReceiverId),
     };
 
     // Add pagination
@@ -93,26 +131,28 @@ export class MessagesService {
 
     // For group messages, verify user is a member
     if (receiver_type === ReceiverType.GROUP) {
-      const group = await this.groupsService.findOne(receiver_id);
-      if (!group.isMember(new Types.ObjectId(userId))) {
+      const group = await this.groupsService.findOne(sanitizedReceiverId);
+      if (!group.isMember(new Types.ObjectId(sanitizedUserId))) {
         throw new ForbiddenException('You are not a member of this group');
       }
     } else {
       // For direct messages, verify user is either sender or receiver
       query.$or = [
-        { sender_id: new Types.ObjectId(userId) },
-        { receiver_id: new Types.ObjectId(userId) },
+        { sender_id: new Types.ObjectId(sanitizedUserId) },
+        { receiver_id: new Types.ObjectId(sanitizedUserId) },
       ];
     }
 
+    // Use lean() to get plain objects instead of Mongoose documents
     const messages = await this.messageModel
       .find(query)
       .populate(
         'sender_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .sort({ timestamp: -1 })
-      .limit(limit)
+      .limit(safeLimit)
+      .lean()
       .exec();
 
     return messages.reverse(); // Return in chronological order
@@ -122,10 +162,19 @@ export class MessagesService {
     groupId: string,
     userId: string,
   ): Promise<Message[]> {
-    const group = await this.groupsService.findOne(groupId);
+    // Validate and sanitize ObjectIds
+    const sanitizedGroupId = sanitizeObjectId(groupId);
+    const sanitizedUserId = sanitizeObjectId(userId);
+
+    if (!sanitizedGroupId || !sanitizedUserId) {
+      throw new BadRequestException('Invalid group or user ID format');
+    }
+
+    const group = await this.groupsService.findOne(sanitizedGroupId);
     const member = group.members.find(
       (member) =>
-        member.user_id.toString() === userId && member.removed_at === null,
+        member.user_id.toString() === sanitizedUserId &&
+        member.removed_at === null,
     );
 
     if (!member) {
@@ -136,14 +185,15 @@ export class MessagesService {
     const messages = await this.messageModel
       .find({
         receiver_type: ReceiverType.GROUP,
-        receiver_id: new Types.ObjectId(groupId),
+        receiver_id: new Types.ObjectId(sanitizedGroupId),
         timestamp: { $gte: member.joined_at },
       })
       .populate(
         'sender_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .sort({ timestamp: 1 })
+      .lean()
       .exec();
 
     return messages;
@@ -153,25 +203,34 @@ export class MessagesService {
     userId1: string,
     userId2: string,
   ): Promise<Message[]> {
+    // Validate and sanitize ObjectIds
+    const sanitizedUserId1 = sanitizeObjectId(userId1);
+    const sanitizedUserId2 = sanitizeObjectId(userId2);
+
+    if (!sanitizedUserId1 || !sanitizedUserId2) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
     const messages = await this.messageModel
       .find({
         receiver_type: ReceiverType.USER,
         $or: [
           {
-            sender_id: new Types.ObjectId(userId1),
-            receiver_id: new Types.ObjectId(userId2),
+            sender_id: new Types.ObjectId(sanitizedUserId1),
+            receiver_id: new Types.ObjectId(sanitizedUserId2),
           },
           {
-            sender_id: new Types.ObjectId(userId2),
-            receiver_id: new Types.ObjectId(userId1),
+            sender_id: new Types.ObjectId(sanitizedUserId2),
+            receiver_id: new Types.ObjectId(sanitizedUserId1),
           },
         ],
       })
       .populate(
         'sender_id',
-        'fullname username email phone_number profile_photo',
+        'full_name username email phone_number profile_photo',
       )
       .sort({ timestamp: 1 })
+      .lean()
       .exec();
 
     return messages;
@@ -186,15 +245,20 @@ export class MessagesService {
       unread_count: number;
     }>
   > {
+    // Validate and sanitize ObjectId
+    const sanitizedUserId = sanitizeObjectId(userId);
+    if (!sanitizedUserId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    const userObjectId = new Types.ObjectId(sanitizedUserId);
+
     // Get recent direct messages
     const directMessages = await this.messageModel.aggregate([
       {
         $match: {
           receiver_type: ReceiverType.USER,
-          $or: [
-            { sender_id: new Types.ObjectId(userId) },
-            { receiver_id: new Types.ObjectId(userId) },
-          ],
+          $or: [{ sender_id: userObjectId }, { receiver_id: userObjectId }],
         },
       },
       {
@@ -204,7 +268,7 @@ export class MessagesService {
         $group: {
           _id: {
             $cond: [
-              { $eq: ['$sender_id', new Types.ObjectId(userId)] },
+              { $eq: ['$sender_id', userObjectId] },
               '$receiver_id',
               '$sender_id',
             ],
@@ -212,11 +276,7 @@ export class MessagesService {
           lastMessage: { $first: '$$ROOT' },
           unreadCount: {
             $sum: {
-              $cond: [
-                { $ne: ['$sender_id', new Types.ObjectId(userId)] },
-                1,
-                0,
-              ],
+              $cond: [{ $ne: ['$sender_id', userObjectId] }, 1, 0],
             },
           },
         },
@@ -237,7 +297,7 @@ export class MessagesService {
           _id: 1,
           user: {
             _id: '$user._id',
-            fullname: '$user.fullname',
+            full_name: '$user.full_name',
             username: '$user.username',
             email: '$user.email',
             phone_number: '$user.phone_number',
@@ -250,7 +310,7 @@ export class MessagesService {
     ]);
 
     // Get recent group messages
-    const userGroups = await this.groupsService.findByUserId(userId);
+    const userGroups = await this.groupsService.findByUserId(sanitizedUserId);
     const groupIds = userGroups
       .map((group) => {
         const groupDoc = group as unknown as { _id?: Types.ObjectId };
@@ -301,16 +361,24 @@ export class MessagesService {
   }
 
   async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await this.messageModel.findById(messageId).exec();
+    // Validate and sanitize ObjectIds
+    const sanitizedMessageId = sanitizeObjectId(messageId);
+    const sanitizedUserId = sanitizeObjectId(userId);
+
+    if (!sanitizedMessageId || !sanitizedUserId) {
+      throw new BadRequestException('Invalid message or user ID format');
+    }
+
+    const message = await this.messageModel.findById(sanitizedMessageId).exec();
     if (!message) {
       throw new NotFoundException('Message not found');
     }
 
     // Only sender can delete their own message
-    if (!message.sender_id.equals(new Types.ObjectId(userId))) {
+    if (!message.sender_id.equals(new Types.ObjectId(sanitizedUserId))) {
       throw new ForbiddenException('You can only delete your own messages');
     }
 
-    await this.messageModel.findByIdAndDelete(messageId).exec();
+    await this.messageModel.findByIdAndDelete(sanitizedMessageId).exec();
   }
 }

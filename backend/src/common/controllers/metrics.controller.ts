@@ -1,4 +1,12 @@
-import { Controller, Get, UseGuards, Request, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Request,
+  Logger,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -9,7 +17,6 @@ import {
 import { JwtAuthGuard } from '../guards/jwt.auth.guard';
 import { Roles } from '../decorators/custom.decorators';
 import { MetricsService, MetricsCounter } from '../services/metrics.services';
-import { AnalyticsMetricsService } from '../../modules/analytics/analytics.metrics.service';
 
 @ApiTags('Metrics')
 @Controller('metrics')
@@ -19,7 +26,9 @@ export class MetricsController {
 
   constructor(
     private readonly metricsService: MetricsService,
-    private readonly analyticsMetricsService: AnalyticsMetricsService,
+    @Optional()
+    @Inject('ANALYTICS_METRICS_SERVICE')
+    private readonly analyticsMetricsService?: any,
   ) {}
 
   @Get()
@@ -48,6 +57,14 @@ export class MetricsController {
   @ApiOperation({ summary: 'Get analytics metrics' })
   @ApiResponse({ status: 200, description: 'Analytics metrics retrieved' })
   async getAnalyticsMetrics() {
+    if (!this.analyticsMetricsService) {
+      return {
+        success: false,
+        message: 'Analytics metrics service not available',
+        data: null,
+      };
+    }
+
     const metrics = await this.analyticsMetricsService.getMetricsSnapshot();
 
     return {
@@ -90,21 +107,22 @@ export class MetricsController {
 
     const lines: string[] = [];
 
-    // FIXED: Validate and sanitize metric names for Prometheus
     const sanitizeMetricName = (name: string): string => {
       // Prometheus metric names must match [a-zA-Z_:][a-zA-Z0-9_:]*
       let sanitized = name.replace(/[^a-zA-Z0-9_:]/g, '_');
-      
+
       // Must start with letter, underscore, or colon
       if (!/^[a-zA-Z_:]/.test(sanitized)) {
         sanitized = '_' + sanitized;
       }
-      
+
       // Validate final name
       if (!/^[a-zA-Z_:][a-zA-Z0-9_:]*$/.test(sanitized)) {
-        this.logger.warn(`Invalid metric name: ${name}, sanitized to: ${sanitized}`);
+        this.logger.warn(
+          `Invalid metric name: ${name}, sanitized to: ${sanitized}`,
+        );
       }
-      
+
       return sanitized;
     };
 
@@ -116,7 +134,7 @@ export class MetricsController {
       lines.push(`${sanitizedName} ${value}`);
     }
 
-    // FIXED: Filter out null histograms BEFORE iteration
+    // Filter out null histograms BEFORE iteration
     const validHistograms = Object.entries(histograms).filter(
       ([_, stats]) => stats !== null,
     );

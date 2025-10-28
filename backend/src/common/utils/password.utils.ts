@@ -1,6 +1,5 @@
 import * as bcrypt from 'bcrypt';
-import { SECURITY_CONSTANTS } from '../constants/app.constants';
-import { APP_CONSTANTS } from '../constants/app.constants';
+import { SECURITY_CONSTANTS, APP_CONSTANTS } from '../constants/app.constants';
 export class PasswordUtils {
   /**
    * Hash password using bcrypt (recommended method)

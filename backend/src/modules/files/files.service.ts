@@ -66,7 +66,7 @@ export class FilesService {
   async findOne(id: string): Promise<File> {
     const file = await this.fileModel
       .findById(id)
-      .populate('uploaded_by', 'fullname username');
+      .populate('uploaded_by', 'full_name username');
     if (!file) {
       throw new NotFoundException('File not found');
     }
@@ -112,9 +112,19 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
-    // Delete physical file
+    // Delete physical file with error handling
     if (fs.existsSync(file.file_path)) {
-      fs.unlinkSync(file.file_path);
+      try {
+        fs.unlinkSync(file.file_path);
+      } catch (error) {
+        // Log error but continue with database deletion
+        console.error(
+          `Failed to delete physical file: ${file.file_path}`,
+          error,
+        );
+        // Note: You may want to use a proper logger here
+        // this.logger.error(`Failed to delete physical file: ${file.file_path}`, error);
+      }
     }
 
     // Delete database record
