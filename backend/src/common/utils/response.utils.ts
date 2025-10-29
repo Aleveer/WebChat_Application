@@ -1,11 +1,12 @@
 import { PaginationUtils } from './pagination.utils';
+import { format } from 'date-fns';
 export class ResponseUtils {
   static success<T>(data?: T, message?: string) {
     return {
       success: true,
       data,
       message,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
   }
 
@@ -14,7 +15,7 @@ export class ResponseUtils {
       success: false,
       message,
       error,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
   }
 
@@ -32,7 +33,7 @@ export class ResponseUtils {
       data,
       pagination,
       message,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
   }
 }

@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class FileUploadService {
@@ -116,7 +117,7 @@ export class FileUploadService {
       // For now, file is already saved by multer
       // In production, move it or upload to cloud storage
       this.logger.log(`File uploaded: ${filename} (${file.size} bytes)`);
-      
+
       return {
         filename,
         path: uploadPath,
@@ -245,7 +246,7 @@ export class FileUploadService {
     const sanitized = this.sanitizeFilename(originalName);
 
     const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 15);
+    const randomString = crypto.randomBytes(8).toString('hex');
     const extension = path.extname(sanitized);
     const baseName = path.basename(sanitized, extension);
 

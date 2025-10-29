@@ -1,10 +1,5 @@
-import {
-  ExceptionFilter,
-  ArgumentsHost,
-  Logger,
-  HttpStatus,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
+import { ExceptionFilter, ArgumentsHost, Logger } from '@nestjs/common';
+import { Request } from 'express';
 import { ErrorCode, getErrorCodeFromStatus } from '../constants/app.constants';
 import {
   ErrorResponse,

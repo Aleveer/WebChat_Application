@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { HealthCheckService } from '../services/healthcheck.services';
 import { Public } from '../decorators/custom.decorators';
-
+import { format } from 'date-fns';
 /**
  * Health Check Controller
  * Provides endpoints for monitoring service health
@@ -99,7 +99,7 @@ export class HealthController {
   async getLiveness() {
     return {
       status: 'alive',
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
   }
 

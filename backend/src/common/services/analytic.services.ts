@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-
+import { format } from 'date-fns';
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
@@ -10,7 +10,7 @@ export class AnalyticsService {
     const event = {
       name: eventName,
       properties,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
     };
 
     if (!this.events.has(eventName)) {

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { CacheService } from './cache.services';
-
+import { format } from 'date-fns';
 @Injectable()
 export class HealthCheckService {
   private readonly logger = new Logger(HealthCheckService.name);
@@ -126,7 +126,7 @@ export class HealthCheckService {
 
     return {
       status: allHealthy ? 'healthy' : 'unhealthy',
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       services,

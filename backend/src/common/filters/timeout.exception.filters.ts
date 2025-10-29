@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { format } from 'date-fns';
 @Catch()
 export class TimeoutExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(TimeoutExceptionFilter.name);
@@ -21,7 +22,7 @@ export class TimeoutExceptionFilter implements ExceptionFilter {
         success: false,
         error: 'REQUEST_TIMEOUT',
         message: 'Request timeout, please try again',
-        timestamp: new Date().toISOString(),
+        timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
         path: request.url,
         method: request.method,
         requestId: request.requestId || 'unknown',

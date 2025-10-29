@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
@@ -71,14 +71,15 @@ import { appConfig } from './config/app.config';
       inject: [ConfigService],
     }),
 
-    // Rate Limiting
+    // Rate Limiting with @nestjs/throttler
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         throttlers: [
           {
-            ttl: configService.get<number>('rateLimit.ttl'),
-            limit: configService.get<number>('rateLimit.limit'),
+            name: 'default',
+            ttl: configService.get<number>('app.rateLimit.ttl') || 60000, // 60 seconds
+            limit: configService.get<number>('app.rateLimit.limit') || 100, // 100 requests
           },
         ],
       }),
@@ -91,8 +92,8 @@ import { appConfig } from './config/app.config';
     // Cache Manager - Native in-memory cache. Make cache settings configurable
     CacheModule.register({
       isGlobal: true,
-      ttl: parseInt(process.env.CACHE_TTL, 10) || 3600000, // 1 hour default
-      max: parseInt(process.env.CACHE_MAX_ITEMS, 10) || 100,
+      ttl: parseInt(process.env.CACHE_TTL, 10),
+      max: parseInt(process.env.CACHE_MAX_ITEMS, 10),
     }),
 
     // Application modules. Enable guards in CommonModule (single registration point)
@@ -112,9 +113,13 @@ import { appConfig } from './config/app.config';
   ],
   controllers: [MetricsController],
   providers: [
-    // Removed duplicate guard registrations
-    // Guards are now registered only in CommonModule to avoid double execution
-    // JwtAuthGuard and RateLimitGuard are configured in CommonModule.forRoot()
+    // Global Guards
+    // ThrottlerGuard for rate limiting (from @nestjs/throttler)
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    // JwtAuthGuard configured in CommonModule.forRoot()
 
     // Global interceptors (specific to AppModule)
     {

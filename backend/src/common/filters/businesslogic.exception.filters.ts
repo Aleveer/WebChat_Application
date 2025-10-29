@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-
+import { format } from 'date-fns';
 @Catch()
 export class BusinessLogicExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(BusinessLogicExceptionFilter.name);
@@ -23,7 +23,7 @@ export class BusinessLogicExceptionFilter implements ExceptionFilter {
         error: exception.errorCode || 'BUSINESS_ERROR',
         message: exception.message,
         details: exception.details,
-        timestamp: new Date().toISOString(),
+        timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
         path: request.url,
         method: request.method,
         requestId: request.requestId || 'unknown',

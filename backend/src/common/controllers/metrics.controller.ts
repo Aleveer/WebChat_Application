@@ -17,7 +17,7 @@ import {
 import { JwtAuthGuard } from '../guards/jwt.auth.guard';
 import { Roles } from '../decorators/custom.decorators';
 import { MetricsService, MetricsCounter } from '../services/metrics.services';
-
+import { format } from 'date-fns';
 @ApiTags('Metrics')
 @Controller('metrics')
 @UseGuards(JwtAuthGuard)
@@ -46,7 +46,7 @@ export class MetricsController {
       data: {
         counters,
         histograms,
-        timestamp: new Date().toISOString(),
+        timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       },
     };
   }

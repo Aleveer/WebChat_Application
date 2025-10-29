@@ -1,28 +1,125 @@
+import { z } from 'zod';
+
 /**
- * Sanitize user input to prevent MongoDB injection
- * Removes MongoDB operators like $where, $regex, etc.
+ * Schema để sanitize MongoDB input
+ * Loại bỏ các MongoDB operators và ký tự đặc biệt
+ */
+export const MongoSafeStringSchema = z
+  .string()
+  .trim()
+  .transform((val) => {
+    // Loại bỏ MongoDB operators và special characters
+    return val
+      .replace(/\$/g, '') // Loại bỏ $ signs (MongoDB operators)
+      .replace(/\{/g, '') // Loại bỏ { (object notation)
+      .replace(/\}/g, '') // Loại bỏ } (object notation)
+      .replace(/\[/g, '') // Loại bỏ [ (array notation)
+      .replace(/\]/g, '') // Loại bỏ ] (array notation)
+      .trim();
+  });
+
+/**
+ * Schema cho MongoDB ObjectId
+ * Validate 24 hex characters
+ */
+export const MongoObjectIdSchema = z
+  .string()
+  .trim()
+  .length(24, 'ObjectId phải có đúng 24 ký tự')
+  .regex(/^[a-fA-F0-9]{24}$/, 'ObjectId không hợp lệ');
+
+/**
+ * Schema cho email
+ * Validate và chuyển về lowercase
+ */
+export const EmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email('Email không hợp lệ')
+  .max(255, 'Email không được vượt quá 255 ký tự');
+
+/**
+ * Schema cho số điện thoại quốc tế
+ * Format: +[1-9][0-9]{1,14}
+ */
+export const PhoneNumberSchema = z
+  .string()
+  .trim()
+  .transform((val) => val.replace(/[^\d+]/g, '')) // Loại bỏ tất cả ký tự không phải số và dấu +
+  .pipe(
+    z
+      .string()
+      .regex(
+        /^\+[1-9]\d{1,14}$/,
+        'Số điện thoại không hợp lệ (format: +[1-9][0-9]{1,14})',
+      ),
+  );
+
+/**
+ * Schema cho regex safe string
+ * Escape các ký tự đặc biệt để ngăn ReDoS attacks
+ */
+export const RegexSafeStringSchema = z
+  .string()
+  .trim()
+  .max(100, 'Input quá dài (tối đa 100 ký tự)')
+  .transform((val) => {
+    // Escape special regex characters
+    return val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  });
+
+/**
+ * Schema cho username
+ * Chỉ cho phép alphanumeric, underscore, và hyphen
+ */
+export const UsernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Username phải có ít nhất 3 ký tự')
+  .max(30, 'Username không được vượt quá 30 ký tự')
+  .regex(
+    /^[a-zA-Z0-9_-]+$/,
+    'Username chỉ được chứa chữ cái, số, gạch dưới và gạch ngang',
+  );
+
+/**
+ * Schema cho URL
+ * Validate và sanitize URL
+ */
+export const UrlSchema = z
+  .string()
+  .trim()
+  .url('URL không hợp lệ')
+  .max(2000, 'URL không được vượt quá 2000 ký tự');
+
+/**
+ * ===========================================
+ * UTILITY FUNCTIONS
+ * ===========================================
+ */
+
+/**
+ * Sanitize user input để ngăn MongoDB injection
  *
  * @param input - User input string
- * @returns Sanitized string safe for MongoDB queries
+ * @returns Sanitized string hoặc error nếu validation thất bại
  */
-//TODO: Làm test-case cho file này
 export function sanitizeMongoInput(input: string): string {
-  if (typeof input !== 'string') {
-    return '';
+  try {
+    return MongoSafeStringSchema.parse(input);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(
+        `Validation failed: ${error.issues.map((e) => e.message).join(', ')}`,
+      );
+    }
+    throw error;
   }
-
-  // Remove MongoDB operators and special characters
-  return input
-    .replace(/\$/g, '') // Remove $ signs (MongoDB operators)
-    .replace(/\{/g, '') // Remove { (object notation)
-    .replace(/\}/g, '') // Remove } (object notation)
-    .replace(/\[/g, '') // Remove [ (array notation)
-    .replace(/\]/g, '') // Remove ] (array notation)
-    .trim();
 }
 
 /**
- * Escape special regex characters to prevent ReDoS attacks
+ * Escape special regex characters để ngăn ReDoS attacks
  *
  * @param input - User input string for regex
  * @returns Escaped string safe for regex construction
@@ -37,29 +134,32 @@ export function escapeRegexCharacters(input: string): string {
 }
 
 /**
- * Create a safe regex pattern from user input
- * Combines sanitization and escaping for safe regex queries
+ * Tạo safe regex pattern từ user input
+ * Kết hợp sanitization và escaping cho safe regex queries
  *
  * @param input - User input string
- * @param flags - Regex flags (default: 'i' for case-insensitive)
+ * @param flags - Regex flags (mặc định: 'i' cho case-insensitive)
  * @returns Safe RegExp object
  */
 export function createSafeRegex(input: string, flags: string = 'i'): RegExp {
-  const sanitized = sanitizeMongoInput(input);
-  const escaped = escapeRegexCharacters(sanitized);
-
-  // Limit length to prevent ReDoS
-  const maxLength = 100;
-  const truncated = escaped.substring(0, maxLength);
-
-  return new RegExp(truncated, flags);
+  try {
+    const sanitizedAndEscaped = RegexSafeStringSchema.parse(input);
+    return new RegExp(sanitizedAndEscaped, flags);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(
+        `Regex validation failed: ${error.issues.map((e) => e.message).join(', ')}`,
+      );
+    }
+    throw error;
+  }
 }
 
 /**
- * Sanitize object to prevent MongoDB injection in query objects
- * Recursively removes $ operators from object keys
+ * Sanitize object để ngăn MongoDB injection trong query objects
+ * Recursively loại bỏ $ operators từ object keys
  *
- * @param obj - Object to sanitize
+ * @param obj - Object cần sanitize
  * @returns Sanitized object
  */
 export function sanitizeQueryObject<T extends Record<string, any>>(obj: T): T {
@@ -71,7 +171,7 @@ export function sanitizeQueryObject<T extends Record<string, any>>(obj: T): T {
 
   for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
-      // Remove $ from key names
+      // Loại bỏ $ từ key names
       const sanitizedKey = key.replace(/^\$/, '') as keyof T;
       const value = obj[key];
 
@@ -92,69 +192,123 @@ export function sanitizeQueryObject<T extends Record<string, any>>(obj: T): T {
 }
 
 /**
- * Validate and sanitize MongoDB ObjectId
+ * Validate và sanitize MongoDB ObjectId
  *
  * @param id - Potential ObjectId string
- * @returns Sanitized ID or null if invalid
+ * @returns Sanitized ID
+ * @throws Error nếu ObjectId không hợp lệ
  */
-export function sanitizeObjectId(id: string): string | null {
-  if (typeof id !== 'string') {
-    return null;
-  }
+export function sanitizeObjectId(id: string): string {
+  return MongoObjectIdSchema.parse(id);
+}
 
-  // MongoDB ObjectId is 24 hex characters
-  const objectIdRegex = /^[a-fA-F0-9]{24}$/;
-
-  if (objectIdRegex.test(id)) {
-    return id;
-  }
-
-  return null;
+/**
+ * Validate và sanitize MongoDB ObjectId (safe version)
+ * Trả về null thay vì throw error
+ *
+ * @param id - Potential ObjectId string
+ * @returns Sanitized ID hoặc null nếu invalid
+ */
+export function sanitizeObjectIdSafe(id: string): string | null {
+  const result = MongoObjectIdSchema.safeParse(id);
+  return result.success ? result.data : null;
 }
 
 /**
  * Sanitize email input
  *
  * @param email - Email string
- * @returns Sanitized email or null if invalid
+ * @returns Sanitized email
+ * @throws Error nếu email không hợp lệ
  */
-export function sanitizeEmail(email: string): string | null {
-  if (typeof email !== 'string') {
-    return null;
-  }
+export function sanitizeEmail(email: string): string {
+  return EmailSchema.parse(email);
+}
 
-  const sanitized = email.toLowerCase().trim();
-
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (emailRegex.test(sanitized) && sanitized.length <= 255) {
-    return sanitized;
-  }
-
-  return null;
+/**
+ * Sanitize email input (safe version)
+ * Trả về null thay vì throw error
+ *
+ * @param email - Email string
+ * @returns Sanitized email hoặc null nếu invalid
+ */
+export function sanitizeEmailSafe(email: string): string | null {
+  const result = EmailSchema.safeParse(email);
+  return result.success ? result.data : null;
 }
 
 /**
  * Sanitize phone number input
  *
  * @param phone - Phone number string
- * @returns Sanitized phone or null if invalid
+ * @returns Sanitized phone number
+ * @throws Error nếu phone number không hợp lệ
  */
-export function sanitizePhoneNumber(phone: string): string | null {
-  if (typeof phone !== 'string') {
-    return null;
-  }
-
-  // Remove all non-digit and non-plus characters
-  const sanitized = phone.replace(/[^\d+]/g, '');
-
-  // International format: +[1-9][0-9]{1,14}
-  const phoneRegex = /^\+[1-9]\d{1,14}$/;
-
-  if (phoneRegex.test(sanitized)) {
-    return sanitized;
-  }
-
-  return null;
+export function sanitizePhoneNumber(phone: string): string {
+  return PhoneNumberSchema.parse(phone);
 }
+
+/**
+ * Sanitize phone number input (safe version)
+ * Trả về null thay vì throw error
+ *
+ * @param phone - Phone number string
+ * @returns Sanitized phone number hoặc null nếu invalid
+ */
+export function sanitizePhoneNumberSafe(phone: string): string | null {
+  const result = PhoneNumberSchema.safeParse(phone);
+  return result.success ? result.data : null;
+}
+
+/**
+ * Sanitize username input
+ *
+ * @param username - Username string
+ * @returns Sanitized username
+ * @throws Error nếu username không hợp lệ
+ */
+export function sanitizeUsername(username: string): string {
+  return UsernameSchema.parse(username);
+}
+
+/**
+ * Sanitize username input (safe version)
+ * Trả về null thay vì throw error
+ *
+ * @param username - Username string
+ * @returns Sanitized username hoặc null nếu invalid
+ */
+export function sanitizeUsernameSafe(username: string): string | null {
+  const result = UsernameSchema.safeParse(username);
+  return result.success ? result.data : null;
+}
+
+/**
+ * Sanitize URL input
+ *
+ * @param url - URL string
+ * @returns Sanitized URL
+ * @throws Error nếu URL không hợp lệ
+ */
+export function sanitizeUrl(url: string): string {
+  return UrlSchema.parse(url);
+}
+
+/**
+ * Sanitize URL input (safe version)
+ * Trả về null thay vì throw error
+ *
+ * @param url - URL string
+ * @returns Sanitized URL hoặc null nếu invalid
+ */
+export function sanitizeUrlSafe(url: string): string | null {
+  const result = UrlSchema.safeParse(url);
+  return result.success ? result.data : null;
+}
+
+export type MongoSafeString = z.infer<typeof MongoSafeStringSchema>;
+export type MongoObjectId = z.infer<typeof MongoObjectIdSchema>;
+export type Email = z.infer<typeof EmailSchema>;
+export type PhoneNumber = z.infer<typeof PhoneNumberSchema>;
+export type Username = z.infer<typeof UsernameSchema>;
+export type Url = z.infer<typeof UrlSchema>;

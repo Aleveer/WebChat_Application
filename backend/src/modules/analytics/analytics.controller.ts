@@ -10,12 +10,12 @@ import {
 import { AnalyticsService } from './analytics.service';
 import { CreateAnalyticsEventDto, GetAnalyticsDto } from './dto/analytics.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { Roles } from '../../common/decorators/custom.decorators';
 import { EventType } from './schemas/analytics-event.schema';
 
 @Controller('analytics')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class AnalyticsController {
   constructor(private analyticsService: AnalyticsService) {}
 

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MongoError } from 'mongodb';
-
+import { format } from 'date-fns';
 @Catch(MongoError)
 export class DatabaseExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(DatabaseExceptionFilter.name);
@@ -43,7 +43,7 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
       error,
       message,
       details: exception.message,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       path: request.url,
       method: request.method,
       requestId: request.requestId || 'unknown',

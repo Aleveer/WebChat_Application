@@ -8,7 +8,6 @@ import {
   AnalyticsEventDocument,
   EventType,
 } from './schemas/analytics-event.schema';
-import { Types } from 'mongoose';
 
 @Injectable()
 export class AnalyticsMetricsService {

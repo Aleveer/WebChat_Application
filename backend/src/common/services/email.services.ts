@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CircuitBreaker } from '../utils/circuit-breaker';
-
+import { format } from 'date-fns';
 // Email Service with Circuit Breaker pattern
 @Injectable()
 export class EmailService {
@@ -44,7 +44,7 @@ export class EmailService {
           message: 'Email sent successfully',
           to,
           subject,
-          timestamp: new Date().toISOString(),
+          timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
           service: 'email',
         });
 
@@ -57,7 +57,7 @@ export class EmailService {
           message: 'Email service unavailable - using fallback',
           to,
           subject,
-          timestamp: new Date().toISOString(),
+          timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
           service: 'email',
           fallback: true,
         });

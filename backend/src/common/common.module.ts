@@ -35,7 +35,6 @@ import { AuthGuard } from './guards/auth.guards';
 import { ApiKeyGuard } from './guards/apikey.guards';
 import { RolesGuard } from './guards/roles.guards';
 import { PermissionsGuard } from './guards/permissions.guards';
-import { RateLimitGuard } from './guards/ratelimit.guards';
 import { ThrottleGuard } from './guards/throttle.guards';
 import { JwtAuthGuard } from './guards/jwt.auth.guard';
 import { GroupAdminGuard } from './guards/group.admin.guards';
@@ -50,9 +49,6 @@ import { ResponseTransformInterceptor } from './interceptors/response.transform.
 import { TimeoutInterceptor } from './interceptors/timeout.interceptors';
 import { CacheInterceptor } from './interceptors/cache.interceptors';
 import { MetricsInterceptor } from './interceptors/metrics.interceptors';
-import { CompressionInterceptor } from './interceptors/compression.interceptors';
-import { SecurityHeadersInterceptor } from './interceptors/security.headers.interceptors';
-import { RateLimitInterceptor } from './interceptors/ratelimit.interceptors';
 
 import { GlobalExceptionFilter } from './filters/global.exception.filters';
 import { HttpExceptionFilter } from './filters/http.exception.filters';
@@ -101,7 +97,6 @@ export class CommonModule {
       ApiKeyGuard,
       RolesGuard,
       PermissionsGuard,
-      RateLimitGuard,
       ThrottleGuard,
       JwtAuthGuard,
       GroupAdminGuard,
@@ -116,9 +111,6 @@ export class CommonModule {
       TimeoutInterceptor,
       CacheInterceptor,
       MetricsInterceptor,
-      CompressionInterceptor,
-      SecurityHeadersInterceptor,
-      RateLimitInterceptor,
 
       GlobalExceptionFilter,
       HttpExceptionFilter,
@@ -141,13 +133,6 @@ export class CommonModule {
         providers.push({
           provide: APP_INTERCEPTOR,
           useClass: SanitizationInterceptor,
-        });
-      }
-
-      if (config.interceptors?.securityHeaders !== false) {
-        providers.push({
-          provide: APP_INTERCEPTOR,
-          useClass: SecurityHeadersInterceptor,
         });
       }
 
@@ -204,7 +189,6 @@ export class CommonModule {
         ApiKeyGuard,
         RolesGuard,
         PermissionsGuard,
-        RateLimitGuard,
         ThrottleGuard,
         JwtAuthGuard,
         GroupAdminGuard,
@@ -218,9 +202,6 @@ export class CommonModule {
         TimeoutInterceptor,
         CacheInterceptor,
         MetricsInterceptor,
-        CompressionInterceptor,
-        SecurityHeadersInterceptor,
-        RateLimitInterceptor,
         GlobalExceptionFilter,
         HttpExceptionFilter,
         DatabaseExceptionFilter,

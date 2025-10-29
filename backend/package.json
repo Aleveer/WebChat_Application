@@ -40,6 +40,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/uuid": "^10.0.0",
+    "@types/lodash": "^4.17.20",
     "axios": "^1.12.2",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
@@ -55,7 +56,11 @@
     "uuid": "^11.0.3",
     "helmet": "^7.1.0",
     "compression": "^1.7.4",
-    "express-rate-limit": "^7.1.5"
+    "zod": "^4.1.12",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "lodash": "^4.17.21",
+    "@sindresorhus/slugify": "^3.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

@@ -172,6 +172,7 @@ export const Public = () => {
 };
 
 // Custom decorator for rate limiting
+// Note: For rate limiting, use @nestjs/throttler decorators from throttle.decorators.ts
 export const RateLimit = (limit: number, windowMs: number) => {
   return (
     target: object,
@@ -183,17 +184,7 @@ export const RateLimit = (limit: number, windowMs: number) => {
   };
 };
 
-// Custom decorator for caching
-export const Cache = (ttl: number, key?: string) => {
-  return (
-    target: object,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ): PropertyDescriptor => {
-    Reflect.defineMetadata('cache', { ttl, key }, descriptor.value);
-    return descriptor;
-  };
-};
+// Note: For caching, use decorators from cache.decorators.ts (@Cache, @ShortCache, etc.)
 
 // Custom decorator for validation groups
 export const ValidationGroups = (...groups: string[]) => {

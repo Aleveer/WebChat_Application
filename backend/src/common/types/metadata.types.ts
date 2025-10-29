@@ -1,6 +1,6 @@
 // Metadata types for flexible data storage
 export type Metadata = Record<string, unknown>;
-export type FileMetadata = Record<string, unknown>;
+export type GenericFileMetadata = Record<string, unknown>;
 export type NotificationMetadata = Record<string, unknown>;
 export type AnalyticsMetadata = Record<string, unknown>;
 
@@ -29,4 +29,13 @@ export interface AnalyticsMetadataStructure {
   location?: string;
   event_source?: string;
   custom_properties?: Record<string, unknown>;
+}
+
+export interface GenericFileMetadataStructure {
+  width?: number;
+  height?: number;
+  duration?: number;
+  tags?: string[];
+  description?: string;
+  custom_fields?: Record<string, unknown>;
 }

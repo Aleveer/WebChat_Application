@@ -1,6 +1,6 @@
 import { ValidationErrorDto } from './validation.error.dto';
 import { ApiProperty } from '@nestjs/swagger';
-
+import { format } from 'date-fns';
 export class ApiResponseDto<T = unknown> {
   @ApiProperty()
   success: boolean;
@@ -49,7 +49,7 @@ export class ApiResponseDto<T = unknown> {
     this.message = message;
     this.errors = errors;
     this.meta = meta || {
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       version: '1.0.0',
     };
   }

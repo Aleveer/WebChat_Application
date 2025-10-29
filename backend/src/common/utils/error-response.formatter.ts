@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { ErrorCode } from '../constants/app.constants';
-
+import { format } from 'date-fns';
 /**
  * Standardized Error Response Interface
  */
@@ -36,7 +36,7 @@ export class ErrorResponseFormatter {
       error,
       message,
       details,
-      timestamp: new Date().toISOString(),
+      timestamp: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       path: request.url,
       method: request.method,
       requestId: request.requestId || 'unknown',

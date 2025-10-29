@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 export class BaseResponseDto<T> {
   success: boolean;
   message: string;
@@ -20,7 +21,7 @@ export class BaseResponseDto<T> {
     this.message = message;
     this.data = data;
     this.error = error;
-    this.timestamp = new Date().toISOString();
+    this.timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
     this.requestId = requestId;
   }
 
