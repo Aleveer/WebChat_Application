@@ -18,10 +18,10 @@ import type { Response } from 'express';
 import { FilesService } from './files.service';
 import { GetFilesDto } from './dto/file.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
 @Controller('files')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class FilesController {
   constructor(private filesService: FilesService) {}
 

@@ -19,11 +19,11 @@ import {
   SendToGroupDto,
 } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { ResponseUtils } from '../../common/utils/response.utils';
 
 @Controller('messages')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 

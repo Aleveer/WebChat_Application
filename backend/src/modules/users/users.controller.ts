@@ -14,12 +14,12 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, LoginDto } from './dto/create-users.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { Public } from '../../common/decorators/custom.decorators';
 import { ResponseUtils } from '../../common/utils/response.utils';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

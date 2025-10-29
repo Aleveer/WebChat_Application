@@ -19,24 +19,74 @@ Tài liệu này hướng dẫn cách chuẩn bị biến môi trường, build 
 
 ### Development – `.env.development`
 
-```bash
-# Backend
+
+# APPLICATION SETTINGS
+
+NODE_ENV=development
+PORT=3000
 BACKEND_PORT=3000
-# Nếu dùng MongoDB container trong compose (mặc định):
-MONGODB_PORT=27017
-MONGODB_URI=mongodb://mongodb:27017/webchat
+BACKEND_DOMAIN=localhost
 
-# Frontend (Vite dev server)
+#### FRONTEND CONFIGURATION
+
 FRONTEND_PORT=5173
+FRONTEND_DOMAIN=localhost
+FRONTEND_URL=http://${FRONTEND_DOMAIN}:${FRONTEND_PORT}
 
-# URL phục vụ cấu hình app (dev)
-FRONTEND_URL=http://localhost:${FRONTEND_PORT}
-API_URL=http://localhost:${BACKEND_PORT}
+#### API URLs (for frontend consumption)
+API_URL=http://${BACKEND_DOMAIN}:${BACKEND_PORT}
 
-# Vite (frontend)
-VITE_API_BASE_URL=${API_URL}
-VITE_SOCKET_URL=${API_URL}
-```
+#### VITE FRONTEND VARIABLES
+##### Note: Vite requires VITE_ prefix for client-side access
+VITE_API_BASE_URL=http://${BACKEND_DOMAIN}:${BACKEND_PORT}
+VITE_SOCKET_URL=http://${BACKEND_DOMAIN}:${BACKEND_PORT}
+
+#### DATABASE CONFIGURATION (MongoDB)
+##### For Docker Desktop: use host.docker.internal
+##### For local MongoDB: use localhost
+MONGODB_URI=mongodb://host.docker.internal:27017/webchat
+
+#### Database pool settings
+DB_MAX_POOL_SIZE=10
+DB_SERVER_SELECTION_TIMEOUT_MS=5000
+DB_SOCKET_TIMEOUT_MS=45000
+
+#### JWT AUTHENTICATION
+##### Generate secure key: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET=
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_SECRET=
+JWT_REFRESH_EXPIRES_IN=30d
+
+#### RATE LIMITING
+##### Relaxed for development (60000ms = 1 minute)
+RATE_LIMIT_TTL=60000
+RATE_LIMIT_LIMIT=100
+
+#### FILE UPLOAD
+FILE_MAX_SIZE=10485760
+UPLOAD_PATH=./uploads
+
+#### EMAIL CONFIGURATION
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+
+#### CACHE CONFIGURATION
+CACHE_TTL=3600000
+CACHE_MAX_ITEMS=100
+
+#### API SECURITY
+VALID_API_KEYS=dev-api-key-1,dev-api-key-2
+
+#### MONITORING & LOGGING
+LOG_LEVEL=debug
+
+#### DEVELOPMENT TOOLS
+DEBUG=true
+ENABLE_SWAGGER=true
 
 Ghi chú:
 

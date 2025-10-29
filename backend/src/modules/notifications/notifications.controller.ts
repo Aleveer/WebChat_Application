@@ -12,10 +12,10 @@ import {
 import { NotificationsService } from './notifications.service';
 import { GetNotificationsDto } from './dto/notification.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 

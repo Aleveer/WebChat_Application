@@ -21,11 +21,11 @@ import {
   SetAdminDto,
 } from './dto/create-group.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { ResponseUtils } from '../../common/utils/response.utils';
 
 @Controller('groups')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, ThrottleGuard)
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 

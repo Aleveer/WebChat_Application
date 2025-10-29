@@ -16,11 +16,11 @@ import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
 import { Public } from '../../common/decorators/custom.decorators';
-import { RateLimitGuard } from '../../common/guards/ratelimit.guards';
+import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
 @ApiTags('Auth')
 @Controller('auth')
-@UseGuards(RateLimitGuard)
+@UseGuards(ThrottleGuard)
 export class AuthController {
   constructor(private authService: AuthService) {}
 
