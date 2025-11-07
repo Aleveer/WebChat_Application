@@ -18,7 +18,7 @@ import {
   SendToUserDto,
   SendToGroupDto,
 } from './dto/create-message.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { ResponseUtils } from '../../common/utils/response.utils';
 

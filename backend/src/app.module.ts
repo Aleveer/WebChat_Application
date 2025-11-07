@@ -23,7 +23,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptors';
 import { ResponseTransformInterceptor } from './common/interceptors/response.transform.interceptors';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
 import { GlobalExceptionFilter } from './common/filters/global.exception.filters';
-
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 // Controllers
 import { MetricsController } from './common/controllers/metrics.controller';
 
@@ -38,14 +38,14 @@ import { appConfig } from './config/app.config';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, jwtConfig, appConfig],
-      envFilePath: ['.env.development', '.env', '.env.production'],
+      envFilePath: ['../.env.development', '.env', '.env.production'],
     }),
 
     // Database
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('database.uri'),
+        uri: configService.get<string>('MONGODB_URI'),
         useNewUrlParser: true,
         useUnifiedTopology: true,
         maxPoolSize: 10,
@@ -60,9 +60,9 @@ import { appConfig } from './config/app.config';
       imports: [ConfigModule],
       global: true,
       useFactory: (configService: ConfigService) => {
-        const expiresIn = configService.get<string>('jwt.expiresIn') || '24h';
+        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '24h';
         return {
-          secret: configService.get<string>('jwt.secret'),
+          secret: configService.get<string>('JWT_SECRET'),
           signOptions: {
             expiresIn: expiresIn as any, // JWT library accepts string durations like '24h', '7d', etc.
           },
@@ -114,10 +114,9 @@ import { appConfig } from './config/app.config';
   controllers: [MetricsController],
   providers: [
     // Global Guards
-    // ThrottlerGuard for rate limiting (from @nestjs/throttler)
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: JwtAuthGuard,
     },
     // JwtAuthGuard configured in CommonModule.forRoot()
 

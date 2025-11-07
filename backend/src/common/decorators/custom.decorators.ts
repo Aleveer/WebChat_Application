@@ -2,7 +2,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 import { APP_CONSTANTS } from '../constants/app.constants';
 import { UserDocument } from '../types';
-import '../types/express.d';
+//import '../types/express.d';
 
 //TODO: Write test-cases for decorators file
 // Get current user from request

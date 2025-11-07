@@ -8,13 +8,17 @@ import {
 import { APP_CONSTANTS } from '../../../common/constants/app.constants';
 
 export class LoginDto {
+  // @IsString()
+  // @IsNotEmpty()
+  // @Matches(APP_CONSTANTS.USERS.PHONE_REGEX, {
+  //   message:
+  //     'Phone number must be in international format (e.g., +84901234567)',
+  // })
+  // phone_number: string;
+
   @IsString()
   @IsNotEmpty()
-  @Matches(APP_CONSTANTS.USERS.PHONE_REGEX, {
-    message:
-      'Phone number must be in international format (e.g., +84901234567)',
-  })
-  phone_number: string;
+  user_name: string;
 
   @IsString()
   @IsNotEmpty()
@@ -23,13 +27,13 @@ export class LoginDto {
 }
 
 export class RegisterDto {
-  @IsString()
-  @IsNotEmpty()
-  @Matches(APP_CONSTANTS.USERS.PHONE_REGEX, {
-    message:
-      'Phone number must be in international format (e.g., +84901234567)',
-  })
-  phone_number: string;
+  // @IsString()
+  // @IsNotEmpty()
+  // @Matches(APP_CONSTANTS.USERS.PHONE_REGEX, {
+  //   message:
+  //     'Phone number must be in international format (e.g., +84901234567)',
+  // })
+  // phone_number: string;
 
   @IsString()
   @IsNotEmpty()

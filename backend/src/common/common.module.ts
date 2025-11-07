@@ -36,7 +36,7 @@ import { ApiKeyGuard } from './guards/apikey.guards';
 import { RolesGuard } from './guards/roles.guards';
 import { PermissionsGuard } from './guards/permissions.guards';
 import { ThrottleGuard } from './guards/throttle.guards';
-import { JwtAuthGuard } from './guards/jwt.auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GroupAdminGuard } from './guards/group.admin.guards';
 import { GroupMemberGuard } from './guards/group.member.guards';
 import { MessageOwnerGuard } from './guards/message.owner.guards';
