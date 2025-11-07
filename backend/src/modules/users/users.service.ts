@@ -24,25 +24,29 @@ export class UsersService {
     private analyticsService: AnalyticsService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    try {
-      const user = new this.userModel(createUserDto);
-      const savedUser = await user.save();
-
-      // Track user registration
-      await this.analyticsService.trackEvent({
-        event_type: 'user_register' as EventType,
-        user_id: savedUser._id.toString(),
-        metadata: { registration_method: 'phone' },
-      });
-
-      return savedUser;
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('Phone number already exists');
-      }
-      throw error;
+  async create(data: {
+    username: string;
+    password: string;
+    phone_number?: string;
+    profile_photo?: string;
+  }): Promise<User> {
+    const { username, password, phone_number, profile_photo } = data;
+    console.log('username from service: ', username);
+    // Check if username already exists
+    const existingUser = await this.userModel.findOne({ username });
+    if (existingUser) {
+      throw new ConflictException('Username already exists');
     }
+
+    // Create new user
+    const newUser = new this.userModel({
+      username: username,
+      password,
+      phone_number,
+      profile_photo,
+    });
+
+    return newUser.save();
   }
 
   async findAll(): Promise<User[]> {
@@ -140,44 +144,6 @@ export class UsersService {
     if (!result) {
       throw new NotFoundException('User not found');
     }
-  }
-
-  async login(loginDto: LoginDto): Promise<{ user: User; message: string }> {
-    // Sanitize phone number to prevent injection
-    const sanitizedPhone = sanitizePhoneNumber(loginDto.phone_number);
-    if (!sanitizedPhone) {
-      throw new BadRequestException('Invalid phone number format');
-    }
-
-    const user = await this.userModel
-      .findOne({
-        phone_number: sanitizedPhone,
-      })
-      .exec();
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const isPasswordValid = await user.comparePassword(loginDto.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // Return user without password
-    const userWithoutPassword = await this.userModel
-      .findById(user._id)
-      .select('-password')
-      .exec();
-
-    if (!userWithoutPassword) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    return {
-      user: userWithoutPassword,
-      message: 'Login successful',
-    };
   }
 
   async searchUsers(query: string): Promise<User[]> {

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { CreateAnalyticsEventDto, GetAnalyticsDto } from './dto/analytics.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { Roles } from '../../common/decorators/custom.decorators';
 import { EventType } from './schemas/analytics-event.schema';

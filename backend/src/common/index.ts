@@ -29,7 +29,7 @@ export * from './guards/apikey.guards';
 export * from './guards/auth.guards';
 export * from './guards/group.admin.guards';
 export * from './guards/group.member.guards';
-export * from './guards/jwt.auth.guard';
+export * from './guards/jwt-auth.guard';
 export * from './guards/message.owner.guards';
 export * from './guards/permissions.guards';
 export * from './guards/roles.guards';

@@ -1,4 +1,4 @@
-import * as bcrypt from 'bcrypt';
+import { hash, verify } from '@node-rs/bcrypt';
 import { SECURITY_CONSTANTS, APP_CONSTANTS } from '../constants/app.constants';
 export class PasswordUtils {
   /**
@@ -9,7 +9,7 @@ export class PasswordUtils {
   static async hashPassword(password: string): Promise<string> {
     try {
       const saltRounds = SECURITY_CONSTANTS.BCRYPT_ROUNDS;
-      return await bcrypt.hash(password, saltRounds);
+      return await hash(password, saltRounds);
     } catch (error) {
       throw new Error(`Password hashing failed: ${error.message}`);
     }
@@ -26,7 +26,7 @@ export class PasswordUtils {
     hash: string,
   ): Promise<boolean> {
     try {
-      return await bcrypt.compare(password, hash);
+      return await verify(password, hash);
     } catch (error) {
       throw new Error(`Password comparison failed: ${error.message}`);
     }

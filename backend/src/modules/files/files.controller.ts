@@ -17,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { FilesService } from './files.service';
 import { GetFilesDto } from './dto/file.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
 @Controller('files')

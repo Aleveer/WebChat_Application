@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
@@ -16,7 +16,7 @@ import { MessagesModule } from '../messages/messages.module';
     MongooseModule.forFeature([
       { name: AnalyticsEvent.name, schema: AnalyticsEventSchema },
     ]),
-    UsersModule,
+    forwardRef(() => UsersModule),
     GroupsModule,
     MessagesModule,
   ],

@@ -2,11 +2,12 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { APP_CONSTANTS } from '../../../common/constants/app.constants';
 import { PasswordUtils } from '../../../common/utils/password.utils';
+import { hash } from '@node-rs/bcrypt';
 export type UserDocument = User & Document;
 
 @Schema({ timestamps: true })
 export class User {
-  id?: string;
+  _id?: string;
   @Prop({
     required: true,
     unique: true,
@@ -15,9 +16,6 @@ export class User {
       'Phone number must be in international format (e.g., +84901234567)',
   })
   phone_number: string;
-
-  @Prop({ required: true, trim: true, maxlength: 100 })
-  full_name: string;
 
   @Prop({
     required: false,
@@ -30,16 +28,16 @@ export class User {
   })
   username?: string;
 
-  @Prop({
-    required: false,
-    unique: true,
-    sparse: true,
-    trim: true,
-    lowercase: true,
-    match: APP_CONSTANTS.USERS.EMAIL_REGEX,
-    message: 'Email must be a valid email address',
-  })
-  email?: string;
+  // @Prop({
+  //   required: false,
+  //   unique: true,
+  //   sparse: true,
+  //   trim: true,
+  //   lowercase: true,
+  //   match: APP_CONSTANTS.USERS.EMAIL_REGEX,
+  //   message: 'Email must be a valid email address',
+  // })
+  // email?: string;
 
   @Prop({
     default: null,
@@ -58,36 +56,32 @@ export class User {
   password: string;
 
   // Method to compare password
-  async comparePassword(candidatePassword: string): Promise<boolean> {
-    return PasswordUtils.comparePassword(candidatePassword, this.password);
-  }
+  // async comparePassword(candidatePassword: string): Promise<boolean> {
+  //   return PasswordUtils.comparePassword(candidatePassword, this.password);
+  // }
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Add virtual id field
-UserSchema.virtual('id').get(function () {
-  return this._id.toHexString();
-});
+// UserSchema.virtual('id').get(function () {
+//   return this._id.toHexString();
+// });
 
 // Ensure virtual fields are serialized
 UserSchema.set('toJSON', {
   virtuals: true,
 });
 
-// Pre-save middleware to hash password
+//Pre-save middleware to hash password
 UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-
-  try {
-    this.password = await PasswordUtils.hashPassword(this.password);
-    next();
-  } catch (error) {
-    next(error);
-  }
+  // Hash password
+  const saltRounds = 10;
+  this.password = await hash(this.password, saltRounds);
+  next();
 });
 
 // Indexes for faster queries
 UserSchema.index({ phone_number: 1 });
 UserSchema.index({ username: 1 }, { sparse: true });
-UserSchema.index({ email: 1 }, { sparse: true });
+//UserSchema.index({ email: 1 }, { sparse: true });

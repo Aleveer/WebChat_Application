@@ -14,9 +14,9 @@ import {
   ApiBearerAuth,
   ApiExcludeEndpoint,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Roles } from '../decorators/custom.decorators';
-import { MetricsService, MetricsCounter } from '../services/metrics.services';
+import { MetricsService } from '../services/metrics.services';
 import { format } from 'date-fns';
 @ApiTags('Metrics')
 @Controller('metrics')

@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { GetNotificationsDto } from './dto/notification.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
 @Controller('notifications')

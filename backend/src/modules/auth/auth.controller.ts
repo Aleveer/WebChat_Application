@@ -14,7 +14,8 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt.auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { LocalAuthGuard } from '../../common/guards/local-auth.guard';
 import { Public } from '../../common/decorators/custom.decorators';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 
@@ -25,21 +26,36 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Public()
+  @Post('/signup')
+  async signUp(
+    @Body()
+    body: {
+      username: string;
+      password: string;
+      phone_number?: string;
+      profile_photo?: string;
+    },
+  ) {
+    const user = await this.authService.signUp(body);
+    return {
+      message: 'Signup successful',
+      user: {
+        id: user._id,
+        username: user.username,
+        phone_number: user.phone_number ?? null,
+        profile_photo: user.profile_photo ?? null,
+      },
+    };
+  }
+
+  @Public()
+  @UseGuards(LocalAuthGuard)
   @Post('login')
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
-  }
-
-  @Public()
-  @Post('register')
-  @ApiOperation({ summary: 'User registration' })
-  @ApiResponse({ status: 201, description: 'Registration successful' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async login(@Request() req: any) {
+    return this.authService.login(req.user._doc);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -52,15 +68,12 @@ export class AuthController {
     return this.authService.refreshToken(req.user);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get user profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@Request() req) {
-    return {
-      user: req.user,
-    };
+    return req.user;
   }
 }
