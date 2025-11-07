@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import { User } from '../types';
 
 // AsyncLocalStorage for request context propagation
 import { AsyncLocalStorage } from 'async_hooks';
@@ -33,7 +34,7 @@ export class RequestIdInterceptor implements NestInterceptor {
     // Create request context map for correlation ID propagation
     const contextMap = new Map<string, any>();
     contextMap.set('requestId', requestId);
-    contextMap.set('userId', request.user?.id || 'anonymous');
+    contextMap.set('userId', (request.user as User)?.id || 'anonymous');
     contextMap.set('ip', request.ip || 'unknown');
     contextMap.set('userAgent', request.headers['user-agent'] || 'unknown');
     contextMap.set('startTime', Date.now());

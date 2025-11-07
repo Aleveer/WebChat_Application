@@ -26,6 +26,9 @@
     "exactOptionalPropertyTypes": false,
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
-    "noUncheckedIndexedAccess": false
-  }
+    "noUncheckedIndexedAccess": false,
+    "typeRoots": ["./node_modules/@types", "./src/common/types"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test"]
 }

@@ -36,8 +36,9 @@ export class RateLimitExceptionFilter
       60, // retry after 60 seconds
     );
 
+    const user = request.user as { id?: string } | undefined;
     this.logger.warn(
-      `Rate Limit Exceeded: ${request.method} ${request.url} - IP: ${request.ip} - User: ${(request.user as any)?.id || 'anonymous'}`,
+      `Rate Limit Exceeded: ${request.method} ${request.url} - IP: ${request.ip} - User: ${user?.id || 'anonymous'}`,
     );
 
     // Add Retry-After header
