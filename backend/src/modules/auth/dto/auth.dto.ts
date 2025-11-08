@@ -62,3 +62,30 @@ export class RegisterDto {
   })
   email?: string;
 }
+
+export class LogoutDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+}
+
+export class ForgotPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH)
+  @Matches(APP_CONSTANTS.USERS.PASSWORD_REGEX, {
+    message:
+      'Password must contain only alphanumeric characters and special characters and should be at least 8 characters long',
+  })
+  password: string;
+}

@@ -26,27 +26,57 @@ export class UsersService {
 
   async create(data: {
     username: string;
+    email?: string;
     password: string;
     phone_number?: string;
     profile_photo?: string;
   }): Promise<User> {
-    const { username, password, phone_number, profile_photo } = data;
+    const { username, email, password, phone_number, profile_photo } = data;
     console.log('username from service: ', username);
+
+    // Validate that at least one identifier is provided
+    if (!username && !email && !phone_number) {
+      throw new BadRequestException(
+        'At least one of username, email, or phone_number is required',
+      );
+    }
+
     // Check if username already exists
-    const existingUser = await this.userModel.findOne({ username });
-    if (existingUser) {
-      throw new ConflictException('Username already exists');
+    if (username) {
+      const existingUser = await this.userModel.findOne({ username });
+      if (existingUser) {
+        throw new ConflictException('Username already exists');
+      }
+    }
+
+    // Check if email already exists
+    if (email) {
+      const existingEmail = await this.userModel.findOne({ email });
+      if (existingEmail) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
+    // Check if phone number already exists
+    if (phone_number) {
+      const existingPhone = await this.userModel.findOne({ phone_number });
+      if (existingPhone) {
+        throw new ConflictException('Phone number already exists');
+      }
     }
 
     // Create new user
     const newUser = new this.userModel({
       username: username,
       password,
+      email,
       phone_number,
       profile_photo,
     });
 
-    return newUser.save();
+    const savedUser = await newUser.save();
+
+    return savedUser.toObject();
   }
 
   async findAll(): Promise<User[]> {

@@ -22,8 +22,8 @@ export class MetricsInterceptor implements NestInterceptor {
 
     const timerName = `http_${method.toLowerCase()}_${this.sanitizeUrl(url)}`;
 
-    // Start timer
-    this.metricsService.startTimer(timerName);
+    // Start timer and save the returned timerKey
+    const timerKey = this.metricsService.startTimer(timerName);
 
     // Increment request counter
     this.metricsService.incrementCounter(
@@ -33,7 +33,7 @@ export class MetricsInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
-          const duration = this.metricsService.endTimer(timerName);
+          const duration = this.metricsService.endTimer(timerKey);
           this.metricsService.incrementCounter('http_requests_success');
           this.metricsService.recordHistogram(
             'http_request_duration_ms',
@@ -44,7 +44,7 @@ export class MetricsInterceptor implements NestInterceptor {
           );
         },
         error: () => {
-          const duration = this.metricsService.endTimer(timerName);
+          const duration = this.metricsService.endTimer(timerKey);
           this.metricsService.incrementCounter('http_requests_error');
           this.metricsService.recordHistogram(
             'http_request_error_duration_ms',

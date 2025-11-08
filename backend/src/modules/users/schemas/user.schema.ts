@@ -9,13 +9,14 @@ export type UserDocument = User & Document;
 export class User {
   _id?: string;
   @Prop({
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     match: APP_CONSTANTS.USERS.PHONE_REGEX,
     message:
       'Phone number must be in international format (e.g., +84901234567)',
   })
-  phone_number: string;
+  phone_number?: string;
 
   @Prop({
     required: false,
@@ -28,16 +29,16 @@ export class User {
   })
   username?: string;
 
-  // @Prop({
-  //   required: false,
-  //   unique: true,
-  //   sparse: true,
-  //   trim: true,
-  //   lowercase: true,
-  //   match: APP_CONSTANTS.USERS.EMAIL_REGEX,
-  //   message: 'Email must be a valid email address',
-  // })
-  // email?: string;
+  @Prop({
+    required: false,
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true,
+    match: APP_CONSTANTS.USERS.EMAIL_REGEX,
+    message: 'Email must be a valid email address',
+  })
+  email?: string;
 
   @Prop({
     default: null,
@@ -84,4 +85,4 @@ UserSchema.pre('save', async function (next) {
 // Indexes for faster queries
 UserSchema.index({ phone_number: 1 });
 UserSchema.index({ username: 1 }, { sparse: true });
-//UserSchema.index({ email: 1 }, { sparse: true });
+UserSchema.index({ email: 1 }, { sparse: true });
