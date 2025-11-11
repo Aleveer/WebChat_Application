@@ -1,80 +1,31 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
-export type MessageDocument = Message & Document;
+// Định nghĩa Type cho receiver_type
+export type ReceiverType = 'user' | 'group';
 
-export enum ReceiverType {
-  USER = 'user',
-  GROUP = 'group',
-}
+export type MessageDocument = HydratedDocument<Message>;
 
 @Schema({ timestamps: true })
 export class Message {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  sender_id: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Conversation', required: true })
+  conversationId: Types.ObjectId;
 
-  @Prop({
-    type: String,
-    enum: ReceiverType,
-    required: true,
-  })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  senderId: Types.ObjectId;
+
+  @Prop({ enum: ['user', 'group'], required: true })
   receiver_type: ReceiverType;
 
-  @Prop({ type: Types.ObjectId, required: true })
-  receiver_id: Types.ObjectId;
+  // receiver_id có thể là User ID hoặc Group ID. Cần xử lý logic này ở tầng service/app.
+  @Prop({ type: Types.ObjectId, required: true }) 
+  receiverId: Types.ObjectId; 
 
-  @Prop({
-    required: true,
-    trim: true,
-    maxlength: 1000,
-    minlength: 1,
-  })
+  @Prop({ required: true })
   text: string;
 
-  @Prop({ type: Date, default: Date.now })
-  timestamp: Date;
-
-  // Virtual field for sender info (populated)
-  sender?: {
-    _id: Types.ObjectId;
-    full_name: string;
-    phone_number: string;
-    username?: string;
-    email?: string;
-    profile_photo?: string;
-  };
-
-  // Virtual field for receiver info (populated)
-  receiver?: {
-    _id: Types.ObjectId;
-    name?: string; // for groups
-    full_name?: string; // for users
-    phone_number?: string; // for users
-    username?: string; // for users
-  };
+  @Prop({ default: Date.now })
+  createdAt: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
-
-// Ensure virtual fields are serialized
-MessageSchema.set('toJSON', {
-  virtuals: true,
-});
-
-// PERFORMANCE: Comprehensive indexing strategy for common queries
-// 1. Compound index for message retrieval by receiver with time ordering
-MessageSchema.index({ receiver_type: 1, receiver_id: 1, timestamp: -1 });
-
-// 2. Index for sender's sent messages
-MessageSchema.index({ sender_id: 1, timestamp: -1 });
-
-// 3. Index for direct message conversations (bidirectional)
-MessageSchema.index({
-  sender_id: 1,
-  receiver_id: 1,
-  receiver_type: 1,
-  timestamp: -1,
-});
-
-// 4. Standalone timestamp index for cleanup/archival operations
-MessageSchema.index({ timestamp: -1 });

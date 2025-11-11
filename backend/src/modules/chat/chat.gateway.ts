@@ -1,347 +1,164 @@
 import {
   WebSocketGateway,
-  WebSocketServer,
   SubscribeMessage,
   MessageBody,
+  WebSocketServer,
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { ChatService } from './chat.service';
 import { JwtService } from '@nestjs/jwt';
-import { Types } from 'mongoose';
-import { MessagesService } from '../messages/messages.service';
-import { UsersService } from '../users/users.service';
-import { GroupsService } from '../groups/groups.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { AnalyticsService } from '../analytics/analytics.service';
-import { EventType } from '../analytics/schemas/analytics-event.schema';
-import { ReceiverType } from '../messages/schemas/message.schema';
+import { jwtConstants } from '../auth/constants';
 
-interface AuthenticatedSocket extends Socket {
-  user?: {
-    sub: string;
-    phone_number: string;
-    username?: string;
-    email?: string;
-  };
+interface CreateMessageDto {
+  from: string;
+  to: string;
+  content: string;
 }
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
+    origin: '*', // Allow all origins for development
   },
-  namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private readonly logger = new Logger(ChatGateway.name);
-  private connectedUsers = new Map<string, string>(); // userId -> socketId
-  private userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
-
   constructor(
-    private jwtService: JwtService,
-    private messagesService: MessagesService,
-    private usersService: UsersService,
-    private groupsService: GroupsService,
-    private notificationsService: NotificationsService,
-    private analyticsService: AnalyticsService,
+    private readonly chatService: ChatService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  async handleConnection(client: AuthenticatedSocket) {
-    try {
-      const token =
-        client.handshake.auth?.token ||
-        client.handshake.headers?.authorization?.split(' ')[1];
+  // Method to emit message to conversation room (called by ChatService after saving)
+  emitMessageToConversation(conversationId: string, message: any) {
+    const roomName = `conv:${conversationId}`;
+    this.server.to(roomName).emit('receiveMessage', message);
+    console.log(`📨 Emitted message to room ${roomName}:`, message.id || message._id);
+  }
 
+  // Authenticate socket on connection using token provided in handshake.auth.token
+  async handleConnection(client: Socket) {
+    try {
+      const token = client.handshake?.auth?.token;
       if (!token) {
-        client.disconnect();
+        console.log('❌ Socket connection rejected: no token');
+        client.disconnect(true);
         return;
       }
 
-      const payload = await this.jwtService.verifyAsync(token);
-      client.user = payload;
-
-      // Track user connection
-      this.connectedUsers.set(payload.sub, client.id);
-
-      if (!this.userSockets.has(payload.sub)) {
-        this.userSockets.set(payload.sub, new Set());
+      // verify token
+      const payload: any = this.jwtService.verify(token);
+      const userId = payload?.sub;
+      const username = payload?.username;
+      if (!userId) {
+        console.log('❌ Socket connection rejected: invalid token payload');
+        client.disconnect(true);
+        return;
       }
-      this.userSockets.get(payload.sub).add(client.id);
 
-      // Join user to their personal room
-      await client.join(`user:${payload.sub}`);
-
-      // Load groups lazily, not on connection
-      // Groups will be joined when user actually navigates to them
-      // This reduces connection time from O(n) to O(1) where n = number of groups
-
-      // Track analytics
-      await this.analyticsService.trackEvent({
-        event_type: EventType.USER_LOGIN,
-        user_id: payload.sub,
-        metadata: { socket_connection: true },
-      });
-
-      // Notify user is online
-      this.server.to(`user:${payload.sub}`).emit('user_online', {
-        user_id: payload.sub,
-        status: 'online',
-      });
-
-      this.logger.log(`User ${payload.sub} connected with socket ${client.id}`);
-    } catch (error) {
-      this.logger.error('Connection error:', error);
-      client.disconnect();
+      // Store user info in socket data (no room join here)
+      client.data.userId = userId;
+      client.data.username = username;
+      console.log(`✅ Socket authenticated for user ${username} (${userId}) - socket ${client.id}`);
+    } catch (err) {
+      console.log('❌ Socket connection rejected (token verify failed):', err?.message || err);
+      client.disconnect(true);
     }
   }
 
-  async handleDisconnect(client: AuthenticatedSocket) {
-    if (client.user) {
-      const userId = client.user.sub;
-
-      // Remove socket from user's socket set
-      if (this.userSockets.has(userId)) {
-        this.userSockets.get(userId).delete(client.id);
-
-        // If no more sockets for this user, mark as offline
-        if (this.userSockets.get(userId).size === 0) {
-          this.connectedUsers.delete(userId);
-          this.userSockets.delete(userId);
-
-          // Notify user is offline
-          this.server.emit('user_offline', {
-            user_id: userId,
-            status: 'offline',
-          });
-
-          // Track analytics
-          await this.analyticsService.trackEvent({
-            event_type: EventType.USER_LOGOUT,
-            user_id: userId,
-            metadata: { socket_disconnection: true },
-          });
-        }
-      }
-
-      this.logger.log(`User ${userId} disconnected`);
-    }
+  handleDisconnect(client: Socket) {
+    console.log(`Socket disconnected: ${client.id} (user ${client.data?.userId})`);
   }
 
-  @SubscribeMessage('send_message')
-  async handleSendMessage(
-    @MessageBody()
-    data: { content: string; group_id?: string; receiver_id?: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
+//   @SubscribeMessage('join')
+//   handleJoin(
+//     @ConnectedSocket() client: Socket,
+//     @MessageBody() username: string,
+//   ) {
+//     // Backward-compatible; still store username if provided
+//     client.data.username = username;
+//     console.log(`User ${username} joined with socket ID: ${client.id}`);
+//     return { event: 'joined', data: `Welcome ${username}!` };
+//   }
+
+  // Join a conversation room when user selects/opens a conversation
+  @SubscribeMessage('joinConversation')
+  handleJoinConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() conversationId: string,
   ) {
-    try {
-      if (!client.user) {
-        return { error: 'Unauthorized' };
-      }
-
-      const { content, group_id, receiver_id } = data;
-
-      if (!content || (!group_id && !receiver_id)) {
-        return { error: 'Invalid message data' };
-      }
-
-      // Create message
-      const message = await this.messagesService.create({
-        sender_id: client.user.sub,
-        receiver_type: group_id ? ReceiverType.GROUP : ReceiverType.USER,
-        receiver_id: group_id || receiver_id,
-        text: content,
-      });
-
-      // Track analytics
-      const messageDoc = message as unknown as {
-        _id?: Types.ObjectId;
-        id?: string;
-      };
-      const messageId = messageDoc._id?.toString() || messageDoc.id;
-      await this.analyticsService.trackMessageSent(
-        client.user.sub,
-        messageId || '',
-        group_id,
-      );
-
-      // Emit to appropriate room
-      if (group_id) {
-        this.server.to(`group:${group_id}`).emit('new_message', {
-          message,
-          sender: client.user,
-        });
-      } else {
-        // Direct message
-        this.server.to(`user:${receiver_id}`).emit('new_message', {
-          message,
-          sender: client.user,
-        });
-        this.server.to(`user:${client.user.sub}`).emit('message_sent', {
-          message,
-        });
-      }
-
-      return { success: true, message };
-    } catch (error) {
-      this.logger.error('Send message error:', error);
-      return { error: 'Failed to send message' };
+    if (!conversationId) {
+      return { error: 'conversationId is required' };
     }
+
+    const roomName = `conv:${conversationId}`;
+    client.join(roomName);
+    console.log(`🚪 User ${client.data.username} (${client.data.userId}) joined conversation room: ${roomName}`);
+    
+    return { event: 'joinedConversation', conversationId };
   }
 
-  @SubscribeMessage('join_group')
-  async handleJoinGroup(
-    @MessageBody() data: { group_id: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
+  // Leave a conversation room (optional, for cleanup when user switches conversations)
+  @SubscribeMessage('leaveConversation')
+  handleLeaveConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() conversationId: string,
   ) {
-    try {
-      if (!client.user) {
-        return { error: 'Unauthorized' };
-      }
-
-      const { group_id } = data;
-
-      // Verify user is member of group
-      const group = await this.groupsService.findOne(group_id);
-      const userId = client.user.sub;
-
-      if (!group) {
-        return { error: 'Group not found' };
-      }
-
-      // Check if user is a member
-      const isMember = group.members?.some(
-        (member) => member.user_id?.toString() === userId && !member.removed_at,
-      );
-
-      if (!isMember) {
-        return { error: 'Not a member of this group' };
-      }
-
-      await client.join(`group:${group_id}`);
-
-      // Track analytics
-      await this.analyticsService.trackEvent({
-        event_type: EventType.GROUP_JOINED,
-        user_id: client.user.sub,
-        metadata: { group_id },
-      });
-
-      return { success: true };
-    } catch (error) {
-      this.logger.error('Join group error:', error);
-      return { error: 'Failed to join group' };
+    if (!conversationId) {
+      return { error: 'conversationId is required' };
     }
+
+    const roomName = `conv:${conversationId}`;
+    client.leave(roomName);
+    console.log(`🚪 User ${client.data.username} (${client.data.userId}) left conversation room: ${roomName}`);
+    
+    return { event: 'leftConversation', conversationId };
   }
 
-  @SubscribeMessage('leave_group')
-  async handleLeaveGroup(
-    @MessageBody() data: { group_id: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
+  @SubscribeMessage('sendMessage')
+  handleMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() createMessageDto: CreateMessageDto,
   ) {
-    try {
-      if (!client.user) {
-        return { error: 'Unauthorized' };
-      }
-
-      const { group_id } = data;
-
-      await client.leave(`group:${group_id}`);
-
-      // Track analytics
-      await this.analyticsService.trackEvent({
-        event_type: EventType.GROUP_LEFT,
-        user_id: client.user.sub,
-        metadata: { group_id },
-      });
-
-      return { success: true };
-    } catch (error) {
-      this.logger.error('Leave group error:', error);
-      return { error: 'Failed to leave group' };
-    }
+    console.log('Message received:', createMessageDto);
+    
+    // TODO: Save message to database using ChatService
+    // const message = await this.chatService.createMessage(createMessageDto);
+    
+    // For now, just broadcast the message
+    const message = {
+      id: Date.now().toString(),
+      from: createMessageDto.from,
+      to: createMessageDto.to,
+      content: createMessageDto.content,
+      timestamp: new Date(),
+    };
+    
+    // Broadcast to all clients (including sender)
+    this.server.emit('receiveMessage', message);
+    
+    return message;
   }
 
-  @SubscribeMessage('typing_start')
-  async handleTypingStart(
-    @MessageBody() data: { group_id?: string; receiver_id?: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
-  ) {
-    if (!client.user) return;
-
-    const { group_id, receiver_id } = data;
-
-    if (group_id) {
-      this.server.to(`group:${group_id}`).emit('user_typing', {
-        user_id: client.user.sub,
-        username: client.user.username,
-        group_id,
-      });
-    } else if (receiver_id) {
-      this.server.to(`user:${receiver_id}`).emit('user_typing', {
-        user_id: client.user.sub,
-        username: client.user.username,
-      });
-    }
-  }
-
-  @SubscribeMessage('typing_stop')
-  async handleTypingStop(
-    @MessageBody() data: { group_id?: string; receiver_id?: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
-  ) {
-    if (!client.user) return;
-
-    const { group_id, receiver_id } = data;
-
-    if (group_id) {
-      this.server.to(`group:${group_id}`).emit('user_stopped_typing', {
-        user_id: client.user.sub,
-        group_id,
-      });
-    } else if (receiver_id) {
-      this.server.to(`user:${receiver_id}`).emit('user_stopped_typing', {
-        user_id: client.user.sub,
-      });
-    }
-  }
-
-  @SubscribeMessage('mark_message_read')
-  async handleMarkMessageRead(
-    @MessageBody() data: { message_id: string },
-    @ConnectedSocket() client: AuthenticatedSocket,
-  ) {
-    try {
-      if (!client.user) {
-        return { error: 'Unauthorized' };
-      }
-
-      const { message_id } = data;
-
-      // Update message read status
-      // Note: markAsRead method needs to be implemented in MessagesService
-      // await this.messagesService.markAsRead(message_id, client.user.sub);
-      this.logger.debug('Mark message as read:', message_id);
-
-      return { success: true };
-    } catch (error) {
-      this.logger.error('Mark message read error:', error);
-      return { error: 'Failed to mark message as read' };
-    }
-  }
-
-  // Helper method to get online users
-  getOnlineUsers(): string[] {
-    return Array.from(this.connectedUsers.keys());
-  }
-
-  // Helper method to check if user is online
-  isUserOnline(userId: string): boolean {
-    return this.connectedUsers.has(userId);
-  }
+//   @SubscribeMessage('getMessages')
+//   handleGetMessages(
+//     @ConnectedSocket() client: Socket,
+//     @MessageBody() data: { userA: string; userB: string },
+//   ) {
+//     console.log(`Loading messages for ${data.userA} and ${data.userB}`);
+    
+//     // TODO: Load messages from database using ChatService
+//     // const messages = await this.chatService.getMessages(data.userA, data.userB);
+    
+//     // For now, return empty array
+//     const messages: any[] = [];
+    
+//     // Send message history to the requesting client
+//     client.emit('messageHistory', { event: 'messageHistory', data: messages });
+    
+//     return { event: 'messageHistory', data: messages };
+//   }
 }
