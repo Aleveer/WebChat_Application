@@ -20,7 +20,7 @@ const handleLogin = async () => {
 
   try {
     // TODO: Replace with actual API call
-    const response = await fetch('http://localhost:3000/auth/login', {
+    const response = await fetch('http://localhost:3000/api/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,8 +37,16 @@ const handleLogin = async () => {
 
     const data = await response.json();
     
+    // Handle both wrapped (data.data.access_token) and unwrapped (data.access_token) responses
+    const token = data.data?.access_token || data.access_token;
+    
+    // Validate token exists
+    if (!token) {
+      throw new Error('No access token received from server');
+    }
+    
     // Store token in localStorage
-    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('access_token', token);
     localStorage.setItem('username', username.value);
     
     // Navigate to chat
@@ -55,8 +63,7 @@ const goToRegister = () => {
 };
 
 const goToForgotPassword = () => {
-  // TODO: Implement password recovery flow
-  alert('Password recovery feature coming soon!');
+  router.push('/forgot-password');
 };
 </script>
 

@@ -14,7 +14,7 @@ export class LoginDto {
   //   message:
   //     'Phone number must be in international format (e.g., +84901234567)',
   // })
-  // phone_number: string;
+  // phone: string;
 
   @IsString()
   @IsNotEmpty()
@@ -33,7 +33,7 @@ export class RegisterDto {
   //   message:
   //     'Phone number must be in international format (e.g., +84901234567)',
   // })
-  // phone_number: string;
+  // phone: string;
 
   @IsString()
   @IsNotEmpty()

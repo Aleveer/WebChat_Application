@@ -19,7 +19,7 @@ export type FileId = string;
 // JWT Payload types
 export interface JwtPayload {
   sub: string;
-  phone_number: string;
+  phone: string;
   username?: string;
   email?: string;
   role?: string;
@@ -37,11 +37,8 @@ export interface UserInfo {
   permissions?: string[];
   groups?: string[];
   adminGroups?: string[];
-  phone_number?: string;
+  phone?: string;
   username?: string;
   email?: string;
   full_name?: string;
 }
-
-// Receiver types
-export type ReceiverType = 'user' | 'group';

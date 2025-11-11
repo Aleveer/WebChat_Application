@@ -437,7 +437,7 @@ export class MediaService {
     
     // Update user profile
     await this.userService.update(userId, {
-      profile_photo: `/uploads/avatars/${result.filename}`,
+      photo: `/uploads/avatars/${result.filename}`,
     });
     
     return {

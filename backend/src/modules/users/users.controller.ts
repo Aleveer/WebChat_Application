@@ -10,9 +10,15 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, LoginDto } from './dto/create-users.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  LoginDto,
+  ChangePasswordDto,
+} from './dto/create-users.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ThrottleGuard } from '../../common/guards/throttle.guards';
 import { Public } from '../../common/decorators/custom.decorators';
@@ -84,5 +90,36 @@ export class UsersController {
   async getUserContacts(@Param('id') id: string) {
     const contacts = await this.usersService.getUserContacts(id);
     return ResponseUtils.success(contacts);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Request() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    const userId = req.user.sub || req.user.id || req.user._id;
+    const result = await this.usersService.changePassword(
+      userId,
+      changePasswordDto,
+    );
+    return ResponseUtils.success(result, result.message);
+  }
+
+  @Get('me/profile')
+  async getCurrentUserProfile(@Request() req) {
+    const userId = req.user.sub || req.user.id || req.user._id;
+    const user = await this.usersService.findOne(userId);
+    return ResponseUtils.success(user);
+  }
+
+  @Patch('me/profile')
+  async updateCurrentUserProfile(
+    @Request() req,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const userId = req.user.sub || req.user.id || req.user._id;
+    const user = await this.usersService.update(userId, updateUserDto);
+    return ResponseUtils.success(user, 'Profile updated successfully');
   }
 }

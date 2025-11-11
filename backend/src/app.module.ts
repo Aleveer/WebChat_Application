@@ -60,9 +60,14 @@ import { appConfig } from './config/app.config';
       imports: [ConfigModule],
       global: true,
       useFactory: (configService: ConfigService) => {
-        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '24h';
+        const expiresIn =
+          configService.get<string>('jwt.expiresIn') ||
+          configService.get<string>('JWT_EXPIRES_IN') ||
+          '24h';
         return {
-          secret: configService.get<string>('JWT_SECRET'),
+          secret:
+            configService.get<string>('jwt.secret') ||
+            configService.get<string>('JWT_SECRET'),
           signOptions: {
             expiresIn: expiresIn as any, // JWT library accepts string durations like '24h', '7d', etc.
           },

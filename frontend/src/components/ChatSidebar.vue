@@ -144,20 +144,29 @@ const searchUsers = async () => {
   showSearchResults.value = true;
 
   try {
-    // TODO: Replace with actual API endpoint
+    const token = localStorage.getItem('access_token');
+    
+    if (!token || token === 'undefined' || token === 'null') {
+      searchResults.value = [];
+      isSearching.value = false;
+      return;
+    }
+    
     const response = await fetch(
-      `http://localhost:3000/users/search?q=${encodeURIComponent(searchQuery.value)}`,
+      `http://localhost:3000/api/v1/users/search?q=${encodeURIComponent(searchQuery.value)}`,
       {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+          'Authorization': `Bearer ${token}`,
         },
       }
     );
 
     if (response.ok) {
       const users = await response.json();
+      // Handle wrapped response from ResponseTransformInterceptor
+      const userList = users.data || users;
       // Filter out current user from results
-      searchResults.value = users.filter((u: User) => u.username !== props.currentUser);
+      searchResults.value = userList.filter((u: User) => u.username !== props.currentUser);
     } else {
       searchResults.value = [];
     }

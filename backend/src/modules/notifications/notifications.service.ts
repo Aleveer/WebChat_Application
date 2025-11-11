@@ -50,7 +50,7 @@ export class NotificationsService {
 
     const notifications = await this.notificationModel
       .find(filter)
-      .populate('sender', 'full_name username profile_photo')
+      .populate('sender', 'full_name username photo')
       .populate('group', 'name description')
       .sort({ createdAt: -1 })
       .skip(skip)

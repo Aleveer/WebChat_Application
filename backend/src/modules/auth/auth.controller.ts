@@ -33,9 +33,10 @@ export class AuthController {
     body: {
       username: string;
       password: string;
-      phone_number?: string;
-      profile_photo?: string;
+      phone?: string;
+      photo?: string;
       email?: string;
+      full_name?: string;
     },
   ) {
     const user = await this.authService.signUp(body);
@@ -45,8 +46,9 @@ export class AuthController {
         id: user._id,
         username: user.username,
         email: user.email ?? null,
-        phone_number: user.phone_number ?? null,
-        profile_photo: user.profile_photo ?? null,
+        phone: user.phone ?? null,
+        photo: user.photo ?? null,
+        full_name: user.full_name ?? null,
       },
     };
   }
@@ -58,7 +60,9 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Request() req: any) {
-    return this.authService.login(req.user._doc);
+    // Handle both Mongoose document and plain object
+    const userData = req.user._doc || req.user;
+    return this.authService.login(userData);
   }
 
   @UseGuards(JwtAuthGuard)

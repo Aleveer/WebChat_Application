@@ -10,11 +10,11 @@ import { Request } from 'express';
 export interface User {
   id: string; // String representation of _id
   _id: string; // MongoDB ObjectId as string
-  phone_number: string; // Unique phone number
+  phone: string; // Unique phone number
   full_name: string; // User's full name
   username?: string; // Optional unique username
   email?: string; // Optional unique email
-  profile_photo?: string; // Optional profile photo URL
+  photo?: string; // Optional profile photo URL
   password?: string; // Hashed password (should not be exposed in responses)
   role?: string; // User role (user, admin)
   permissions?: string[]; // User permissions
@@ -32,11 +32,11 @@ export interface User {
 export interface UserDocument {
   id?: string;
   _id?: { toString: () => string } | string;
-  phone_number?: string;
+  phone?: string;
   full_name?: string;
   username?: string;
   email?: string;
-  profile_photo?: string;
+  photo?: string;
   role?: string;
   permissions?: string[];
   groups?: string[];

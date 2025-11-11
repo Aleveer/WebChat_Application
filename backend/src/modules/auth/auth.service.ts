@@ -27,8 +27,9 @@ export class AuthService {
     username: string;
     password: string;
     email?: string;
-    phone_number?: string;
-    profile_photo?: string;
+    phone?: string;
+    photo?: string;
+    full_name?: string;
   }): Promise<User> {
     const user = await this.usersService.create(data);
     return user;
@@ -37,6 +38,14 @@ export class AuthService {
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findByUsername(username);
     if (user) {
+      // Validate password field exists and is a string
+      if (!user.password || typeof user.password !== 'string') {
+        Logger.error(
+          `Password validation failed: password field is ${typeof user.password}`,
+        );
+        return null;
+      }
+
       const isMatch = await verify(pass, user.password);
 
       if (isMatch) {
@@ -51,12 +60,11 @@ export class AuthService {
     const payload = {
       sub: user._id,
       username: user.username,
-      phone_number: user.phone_number,
-      profile_photo: user.profile_photo,
+      phone: user.phone,
+      photo: user.photo,
     };
-    console.log('payload: ', payload);
     return {
-      access_token: await this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload),
     };
   }
 
@@ -182,7 +190,7 @@ export class AuthService {
   async refreshToken(user: { sub: string; [key: string]: unknown }) {
     const payload = {
       sub: user.sub,
-      phone_number: user.phone_number,
+      phone: user.phone,
       username: user.username,
       email: user.email,
     };

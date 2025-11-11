@@ -15,7 +15,7 @@ export interface AuthResponse {
   refresh_token: string;
   user: {
     id: string;
-    phone_number: string;
+    phone: string;
     username?: string;
     email?: string;
   };
@@ -23,11 +23,11 @@ export interface AuthResponse {
 
 export interface UserResponse {
   id: string;
-  phone_number: string;
+  phone: string;
   full_name: string;
   username?: string;
   email?: string;
-  profile_photo?: string;
+  photo?: string;
   created_at: Date;
   updated_at: Date;
 }

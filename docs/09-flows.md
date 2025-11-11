@@ -74,7 +74,7 @@
 │  4. Load user payload                                       │
 │     Payload: {                                              │
 │       sub: "user123",                                       │
-│       phone_number: "+84901234567",                        │
+│       phone: "+84901234567",                        │
 │       username: "john_doe",                                │
 │       role: "user",                                         │
 │       permissions: ["read", "write"],                      │
@@ -418,7 +418,7 @@ Client                  Controller              Service                 Database
   │  POST /auth/register    │                      │                       │
   ├────────────────────────►│                      │                       │
   │  {                      │                      │                       │
-  │    phone_number,        │  Validate DTO        │                       │
+  │    phone,        │  Validate DTO        │                       │
   │    password,            ├─────────────►        │                       │
   │    full_name            │                      │                       │
   │  }                      │                      │  Check existing user  │
@@ -459,14 +459,14 @@ Client                  Controller              Service                 Database
 
 ```
 1. Client gửi credentials
-   └─► { phone_number: "+84901234567", password: "MyPassword123!" }
+   └─► { phone: "+84901234567", password: "MyPassword123!" }
 
 2. AuthController nhận request
    └─► Validate LoginDto
 
 3. AuthService.validateUser()
-   ├─► Find user by phone_number
-   │   └─► userRepository.findOne({ phone_number })
+   ├─► Find user by phone
+   │   └─► userRepository.findOne({ phone })
    │
    ├─► Check if user exists
    │   └─► If not found: Throw UnauthorizedException
@@ -481,7 +481,7 @@ Client                  Controller              Service                 Database
    ├─► Create JWT payload
    │   └─► {
    │         sub: user._id,
-   │         phone_number: user.phone_number,
+   │         phone: user.phone,
    │         username: user.username,
    │         email: user.email,
    │         role: user.role,
@@ -502,7 +502,7 @@ Client                  Controller              Service                 Database
          data: {
            access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
            refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-           user: { id, phone_number, full_name, ... }
+           user: { id, phone, full_name, ... }
          }
        }
 ```
@@ -523,7 +523,7 @@ Client                  Controller              Service                 Database
    │   └─► Validate signature
    │
    ├─► If valid: Extract payload
-   │   └─► { sub, phone_number, role, permissions, ... }
+   │   └─► { sub, phone, role, permissions, ... }
    │
    ├─► Attach user to request
    │   └─► request.user = payload
@@ -668,7 +668,7 @@ Response to client (400 Bad Request)
 
 ```
 Service tries to create duplicate user
-{ phone_number: "+84901234567", ... } (already exists)
+{ phone: "+84901234567", ... } (already exists)
     │
     ▼
 MongoDB throws MongoError

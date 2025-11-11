@@ -256,7 +256,7 @@ CommonModule (forRoot)
 │   Client    │
 └──────┬──────┘
        │ POST /auth/login
-       │ { phone_number, password }
+       │ { phone, password }
        ▼
 ┌──────────────────────┐
 │  AuthController      │

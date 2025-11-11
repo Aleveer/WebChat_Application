@@ -146,10 +146,7 @@ export class MessagesService {
     // Use lean() to get plain objects instead of Mongoose documents
     const messages = await this.messageModel
       .find(query)
-      .populate(
-        'sender_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('sender_id', 'full_name username email phone photo')
       .sort({ timestamp: -1 })
       .limit(safeLimit)
       .lean()
@@ -188,10 +185,7 @@ export class MessagesService {
         receiver_id: new Types.ObjectId(sanitizedGroupId),
         timestamp: { $gte: member.joined_at },
       })
-      .populate(
-        'sender_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('sender_id', 'full_name username email phone photo')
       .sort({ timestamp: 1 })
       .lean()
       .exec();
@@ -225,10 +219,7 @@ export class MessagesService {
           },
         ],
       })
-      .populate(
-        'sender_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('sender_id', 'full_name username email phone photo')
       .sort({ timestamp: 1 })
       .lean()
       .exec();
@@ -300,8 +291,8 @@ export class MessagesService {
             full_name: '$user.full_name',
             username: '$user.username',
             email: '$user.email',
-            phone_number: '$user.phone_number',
-            profile_photo: '$user.profile_photo',
+            phone: '$user.phone',
+            photo: '$user.photo',
           },
           lastMessage: 1,
           unreadCount: 1,
@@ -375,7 +366,7 @@ export class MessagesService {
     }
 
     // Only sender can delete their own message
-    if (!message.sender_id.equals(new Types.ObjectId(sanitizedUserId))) {
+    if (!message.senderId.equals(new Types.ObjectId(sanitizedUserId))) {
       throw new ForbiddenException('You can only delete your own messages');
     }
 

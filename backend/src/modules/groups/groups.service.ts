@@ -58,20 +58,14 @@ export class GroupsService {
   async findAll(): Promise<Group[]> {
     return this.groupModel
       .find()
-      .populate(
-        'members.user_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('members.user_id', 'full_name username email phone photo')
       .exec();
   }
 
   async findOne(id: string): Promise<Group> {
     const group = await this.groupModel
       .findById(id)
-      .populate(
-        'members.user_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('members.user_id', 'full_name username email phone photo')
       .exec();
 
     if (!group) {
@@ -86,10 +80,7 @@ export class GroupsService {
         'members.user_id': new Types.ObjectId(userId),
         'members.removed_at': null,
       })
-      .populate(
-        'members.user_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('members.user_id', 'full_name username email phone photo')
       .exec();
   }
 
@@ -111,10 +102,7 @@ export class GroupsService {
 
     const updatedGroup = await this.groupModel
       .findByIdAndUpdate(id, updateGroupDto, { new: true, runValidators: true })
-      .populate(
-        'members.user_id',
-        'full_name username email phone_number profile_photo',
-      )
+      .populate('members.user_id', 'full_name username email phone photo')
       .exec();
 
     return updatedGroup;

@@ -449,7 +449,7 @@ export const DEFAULT_INTERCEPTOR_CONFIG = {
 export class CreateUserDto {
   @IsNotEmpty()
   @IsPhoneNumber()
-  phone_number: string;
+  phone: string;
   
   @MinLength(8)
   password: string;
@@ -462,8 +462,8 @@ export class CreateUserDto {
   "message": "Validation failed",
   "details": [
     {
-      "field": "phone_number",
-      "message": "phone_number must be a valid phone number"
+      "field": "phone",
+      "message": "phone must be a valid phone number"
     },
     {
       "field": "password",
@@ -485,7 +485,7 @@ export class CreateUserDto {
   "success": false,
   "error": "DUPLICATE_ENTRY",
   "message": "Duplicate entry found",
-  "details": "E11000 duplicate key error: phone_number"
+  "details": "E11000 duplicate key error: phone"
 }
 
 // Validation error

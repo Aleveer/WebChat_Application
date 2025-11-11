@@ -129,7 +129,7 @@ Type cho JWT token payload.
 ```typescript
 export interface JwtPayload {
   sub: string;              // User ID
-  phone_number: string;
+  phone: string;
   username?: string;
   email?: string;
   role?: string;
@@ -152,7 +152,7 @@ export class AuthService {
   async generateToken(user: User): Promise<string> {
     const payload: JwtPayload = {
       sub: user.id,
-      phone_number: user.phoneNumber,
+      phone: user.phoneNumber,
       email: user.email,
       role: user.role,
       permissions: user.permissions,
@@ -183,7 +183,7 @@ export interface UserInfo {
   permissions?: string[];
   groups?: string[];
   adminGroups?: string[];
-  phone_number?: string;
+  phone?: string;
   username?: string;
   email?: string;
   full_name?: string;
@@ -304,7 +304,7 @@ export interface AuthResponse {
   refresh_token: string;
   user: {
     id: string;
-    phone_number: string;
+    phone: string;
     username?: string;
     email?: string;
   };
@@ -326,7 +326,7 @@ async login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
     refresh_token: tokens.refreshToken,
     user: {
       id: user.id,
-      phone_number: user.phoneNumber,
+      phone: user.phoneNumber,
       email: user.email,
       username: user.username,
     },
@@ -345,11 +345,11 @@ Standard response types cho các entities.
 ```typescript
 export interface UserResponse {
   id: string;
-  phone_number: string;
+  phone: string;
   full_name: string;
   username?: string;
   email?: string;
-  profile_photo?: string;
+  photo?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -652,11 +652,11 @@ declare global {
       user?: {
         id: string;
         _id: string;
-        phone_number: string;
+        phone: string;
         full_name: string;
         username?: string;
         email?: string;
-        profile_photo?: string;
+        photo?: string;
         role?: string;
         permissions?: string[];
         groups?: string[];
@@ -702,11 +702,11 @@ Complete user type.
 export interface User {
   id: string;
   _id: string;
-  phone_number: string;
+  phone: string;
   full_name: string;
   username?: string;
   email?: string;
-  profile_photo?: string;
+  photo?: string;
   password?: string;
   role?: string;
   permissions?: string[];
@@ -728,11 +728,11 @@ Flexible user document type.
 export interface UserDocument {
   id?: string;
   _id?: { toString: () => string } | string;
-  phone_number?: string;
+  phone?: string;
   full_name?: string;
   username?: string;
   email?: string;
-  profile_photo?: string;
+  photo?: string;
   role?: string;
   permissions?: string[];
   groups?: string[];

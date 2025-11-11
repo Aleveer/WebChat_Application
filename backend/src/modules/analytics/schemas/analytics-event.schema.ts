@@ -16,6 +16,7 @@ export enum EventType {
   NOTIFICATION_READ = 'notification_read',
   PROFILE_UPDATED = 'profile_updated',
   SETTINGS_CHANGED = 'settings_changed',
+  PASSWORD_CHANGED = 'password_changed',
 }
 
 @Schema({ timestamps: true })

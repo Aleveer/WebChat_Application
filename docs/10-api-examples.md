@@ -21,7 +21,7 @@
 curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "phone_number": "+84901234567",
+    "phone": "+84901234567",
     "password": "MySecurePassword123!",
     "full_name": "Nguyen Van A",
     "email": "nguyenvana@example.com",
@@ -39,7 +39,7 @@ curl -X POST http://localhost:3000/api/auth/register \
     "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
       "id": "507f1f77bcf86cd799439011",
-      "phone_number": "+84901234567",
+      "phone": "+84901234567",
       "full_name": "Nguyen Van A",
       "email": "nguyenvana@example.com",
       "username": "nguyenvana",
@@ -53,7 +53,7 @@ curl -X POST http://localhost:3000/api/auth/register \
 
 **Validation Rules:**
 
-- `phone_number`: Required, must match format `+[1-9][0-9]{1,14}`
+- `phone`: Required, must match format `+[1-9][0-9]{1,14}`
 - `password`: Required, 8-64 characters, must contain uppercase, lowercase, number, and special character
 - `full_name`: Required, 1-100 characters, letters and spaces only
 - `email`: Optional, valid email format
@@ -69,8 +69,8 @@ curl -X POST http://localhost:3000/api/auth/register \
   "message": "Validation failed",
   "details": [
     {
-      "field": "phone_number",
-      "message": "phone_number must match format +[1-9][0-9]{1,14}"
+      "field": "phone",
+      "message": "phone must match format +[1-9][0-9]{1,14}"
     }
   ],
   "timestamp": "2025-10-29 10:00:00",
@@ -101,7 +101,7 @@ curl -X POST http://localhost:3000/api/auth/register \
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "phone_number": "+84901234567",
+    "phone": "+84901234567",
     "password": "MySecurePassword123!"
   }'
 ```
@@ -116,7 +116,7 @@ curl -X POST http://localhost:3000/api/auth/login \
     "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
       "id": "507f1f77bcf86cd799439011",
-      "phone_number": "+84901234567",
+      "phone": "+84901234567",
       "full_name": "Nguyen Van A",
       "email": "nguyenvana@example.com",
       "username": "nguyenvana",
@@ -187,11 +187,11 @@ curl -X GET http://localhost:3000/api/auth/me \
   "success": true,
   "data": {
     "id": "507f1f77bcf86cd799439011",
-    "phone_number": "+84901234567",
+    "phone": "+84901234567",
     "full_name": "Nguyen Van A",
     "email": "nguyenvana@example.com",
     "username": "nguyenvana",
-    "profile_photo": "https://example.com/photos/user.jpg",
+    "photo": "https://example.com/photos/user.jpg",
     "role": "user",
     "permissions": ["read", "write"],
     "groups": ["group123", "group456"],
@@ -227,7 +227,7 @@ curl -X PATCH http://localhost:3000/api/users/me \
   "success": true,
   "data": {
     "id": "507f1f77bcf86cd799439011",
-    "phone_number": "+84901234567",
+    "phone": "+84901234567",
     "full_name": "Nguyen Van B",
     "email": "newemail@example.com",
     "username": "nguyenvanb",
@@ -282,10 +282,10 @@ curl -X GET http://localhost:3000/api/users/507f1f77bcf86cd799439011 \
   "success": true,
   "data": {
     "id": "507f1f77bcf86cd799439011",
-    "phone_number": "+84901234567",
+    "phone": "+84901234567",
     "full_name": "Nguyen Van A",
     "username": "nguyenvana",
-    "profile_photo": "https://example.com/photos/user.jpg",
+    "photo": "https://example.com/photos/user.jpg",
     "created_at": "2025-10-29T10:00:00.000Z"
   },
   "timestamp": "2025-10-29 10:05:00"
@@ -311,13 +311,13 @@ curl -X GET "http://localhost:3000/api/users/search?q=nguyen&page=1&limit=20" \
   "data": [
     {
       "id": "507f1f77bcf86cd799439011",
-      "phone_number": "+84901234567",
+      "phone": "+84901234567",
       "full_name": "Nguyen Van A",
       "username": "nguyenvana"
     },
     {
       "id": "507f1f77bcf86cd799439012",
-      "phone_number": "+84901234568",
+      "phone": "+84901234568",
       "full_name": "Nguyen Thi B",
       "username": "nguyenthib"
     }

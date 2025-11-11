@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSocket } from '../composables/useSocket';
 import ChatSidebar from '../components/ChatSidebar.vue';
+import ProfileSettings from '../components/ProfileSettings.vue';
 
 interface ApiConversation {
   conversationId: string;
@@ -37,6 +38,7 @@ const recipientId = ref('');
 const activeConversationId = ref(''); // Store active conversation ID
 const newMessage = ref('');
 const showProfileDropdown = ref(false);
+const showProfileSettings = ref(false);
 const conversations = ref<ApiConversation[]>([]);
 const isLoadingConversations = ref(false);
 
@@ -330,8 +332,11 @@ const closeDropdown = () => {
 
 const goToProfile = () => {
   showProfileDropdown.value = false;
-  // TODO: Navigate to profile page when implemented
-  alert('Profile page coming soon!');
+  showProfileSettings.value = true;
+};
+
+const closeProfileSettings = () => {
+  showProfileSettings.value = false;
 };
 
 const selectConversation = async (username: string) => {
@@ -533,6 +538,13 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- Profile Settings Modal -->
+    <ProfileSettings
+      v-if="showProfileSettings"
+      :currentUserId="currentUserId"
+      @close="closeProfileSettings"
+    />
   </div>
 </template>
 

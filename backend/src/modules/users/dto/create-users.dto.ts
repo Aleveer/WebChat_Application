@@ -9,6 +9,7 @@ import {
   MaxLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { APP_CONSTANTS } from '../../../common/constants/app.constants';
 
 export class CreateUserDto {
@@ -16,13 +17,14 @@ export class CreateUserDto {
     message: 'Phone number must be in international format',
   })
   @IsNotEmpty()
-  phone_number: string;
+  phone: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(APP_CONSTANTS.USERS.MAX_NAME_LENGTH)
   @Matches(APP_CONSTANTS.USERS.FULL_NAME_REGEX, {
-    message: 'Full name must contain only letters and spaces',
+    message:
+      'Full name must contain only letters and spaces (Unicode supported)',
   })
   full_name: string;
 
@@ -44,10 +46,10 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsUrl({}, { message: 'Profile photo must be a valid URL' })
-  @Matches(APP_CONSTANTS.USERS.PROFILE_PHOTO_REGEX, {
+  @Matches(APP_CONSTANTS.USERS.PHOTO_REGEX, {
     message: 'Profile photo must be an image file',
   })
-  profile_photo?: string;
+  photo?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -63,10 +65,14 @@ export class CreateUserDto {
 
 export class UpdateUserDto {
   @IsOptional()
+  @Transform(({ value }) =>
+    value === null || value === '' ? undefined : value,
+  )
   @IsString()
   @MaxLength(APP_CONSTANTS.USERS.MAX_NAME_LENGTH)
   @Matches(APP_CONSTANTS.USERS.FULL_NAME_REGEX, {
-    message: 'Full name must contain only letters and spaces',
+    message:
+      'Full name must contain only letters and spaces (Unicode supported)',
   })
   full_name?: string;
 
@@ -80,6 +86,9 @@ export class UpdateUserDto {
   username?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === null || value === '' ? undefined : value,
+  )
   @IsEmail({}, { message: 'Email must be a valid email address' })
   @Matches(APP_CONSTANTS.USERS.EMAIL_REGEX, {
     message: 'Email must be a valid email address',
@@ -87,11 +96,23 @@ export class UpdateUserDto {
   email?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    value === null || value === '' ? undefined : value,
+  )
+  @IsPhoneNumber(undefined, {
+    message: 'Phone number must be in international format',
+  })
+  phone?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === null || value === '' ? undefined : value,
+  )
   @IsUrl({}, { message: 'Profile photo must be a valid URL' })
-  @Matches(APP_CONSTANTS.USERS.PROFILE_PHOTO_REGEX, {
+  @Matches(APP_CONSTANTS.USERS.PHOTO_REGEX, {
     message: 'Profile photo must be an image file',
   })
-  profile_photo?: string;
+  photo?: string;
 
   @IsOptional()
   @IsString()
@@ -110,9 +131,26 @@ export class LoginDto {
     message: 'Phone number must be in international format',
   })
   @IsNotEmpty()
-  phone_number: string;
+  phone: string;
 
   @IsString()
   @IsNotEmpty()
   password: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  currentPassword: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(APP_CONSTANTS.USERS.MIN_PASSWORD_LENGTH, {
+    message: 'New password must be at least 8 characters long',
+  })
+  @Matches(APP_CONSTANTS.USERS.PASSWORD_REGEX, {
+    message:
+      'Password must contain only alphanumeric characters and special characters',
+  })
+  newPassword: string;
 }

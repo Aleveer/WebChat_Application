@@ -83,8 +83,8 @@ export class ValidationExceptionFilter extends BaseExceptionFilter {
   "message": "Validation failed",
   "details": [
     {
-      "field": "phone_number",
-      "message": "phone_number must be a valid phone number",
+      "field": "phone",
+      "message": "phone must be a valid phone number",
       "value": "invalid-phone"
     },
     {
@@ -107,7 +107,7 @@ export class ValidationExceptionFilter extends BaseExceptionFilter {
 export class CreateUserDto {
   @IsNotEmpty()
   @IsPhoneNumber()
-  phone_number: string;
+  phone: string;
 
   @MinLength(8)
   @MaxLength(64)
@@ -122,7 +122,7 @@ export class CreateUserDto {
 // Request với invalid data
 POST /api/users
 {
-  "phone_number": "invalid",
+  "phone": "invalid",
   "password": "weak",
   "email": "not-an-email"
 }
@@ -134,8 +134,8 @@ POST /api/users
   "message": "Validation failed",
   "details": [
     {
-      "field": "phone_number",
-      "message": "phone_number must be a valid phone number"
+      "field": "phone",
+      "message": "phone must be a valid phone number"
     },
     {
       "field": "password",
@@ -358,7 +358,7 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
   "success": false,
   "error": "DUPLICATE_ENTRY",
   "message": "Duplicate entry found",
-  "details": "E11000 duplicate key error collection: webchat.users index: phone_number_1 dup key: { phone_number: \"+84901234567\" }",
+  "details": "E11000 duplicate key error collection: webchat.users index: phone_1 dup key: { phone: \"+84901234567\" }",
   "timestamp": "2025-10-29 10:00:00",
   "path": "/api/users",
   "method": "POST",

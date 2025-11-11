@@ -8,7 +8,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
-import { CreateUserDto, UpdateUserDto, LoginDto } from './dto/create-users.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  LoginDto,
+  ChangePasswordDto,
+} from './dto/create-users.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { EventType } from '../analytics/schemas/analytics-event.schema';
 import {
@@ -16,6 +21,7 @@ import {
   sanitizePhoneNumber,
   sanitizeObjectId,
 } from '../../common/utils/sanitization.utils';
+import { PasswordUtils } from '../../common/utils/password.utils';
 
 @Injectable()
 export class UsersService {
@@ -28,16 +34,17 @@ export class UsersService {
     username: string;
     email?: string;
     password: string;
-    phone_number?: string;
-    profile_photo?: string;
+    phone?: string;
+    photo?: string;
+    full_name?: string;
   }): Promise<User> {
-    const { username, email, password, phone_number, profile_photo } = data;
+    const { username, email, password, phone, photo, full_name } = data;
     console.log('username from service: ', username);
 
     // Validate that at least one identifier is provided
-    if (!username && !email && !phone_number) {
+    if (!username && !email && !phone) {
       throw new BadRequestException(
-        'At least one of username, email, or phone_number is required',
+        'At least one of username, email, or phone is required',
       );
     }
 
@@ -58,8 +65,8 @@ export class UsersService {
     }
 
     // Check if phone number already exists
-    if (phone_number) {
-      const existingPhone = await this.userModel.findOne({ phone_number });
+    if (phone) {
+      const existingPhone = await this.userModel.findOne({ phone });
       if (existingPhone) {
         throw new ConflictException('Phone number already exists');
       }
@@ -70,8 +77,9 @@ export class UsersService {
       username: username,
       password,
       email,
-      phone_number,
-      profile_photo,
+      phone,
+      photo,
+      full_name,
     });
 
     const savedUser = await newUser.save();
@@ -108,7 +116,8 @@ export class UsersService {
     }
 
     const user = await this.userModel
-      .findOne({ phone_number: sanitizedPhone })
+      .findOne({ phone: sanitizedPhone })
+      .lean()
       .exec();
 
     return user;
@@ -127,11 +136,13 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return this.userModel.findOne({ username }).exec();
+    const user = await this.userModel.findOne({ username }).lean().exec();
+    return user;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    const user = await this.userModel.findOne({ email }).lean().exec();
+    return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
@@ -141,10 +152,88 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID format');
     }
 
+    // Check if updating username and it already exists
+    if (updateUserDto.username) {
+      const existingUser = await this.userModel.findOne({
+        username: updateUserDto.username,
+        _id: { $ne: sanitizedId },
+      });
+      if (existingUser) {
+        throw new ConflictException('Username already exists');
+      }
+    }
+
+    // Check if updating email and it already exists
+    if (updateUserDto.email) {
+      const existingEmail = await this.userModel.findOne({
+        email: updateUserDto.email,
+        _id: { $ne: sanitizedId },
+      });
+      if (existingEmail) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
+    // Check if updating phone and it already exists
+    if (updateUserDto.phone) {
+      const existingPhone = await this.userModel.findOne({
+        phone: updateUserDto.phone,
+        _id: { $ne: sanitizedId },
+      });
+      if (existingPhone) {
+        throw new ConflictException('Phone number already exists');
+      }
+    }
+
+    // Get current user to validate email/phone requirement
+    const currentUser = await this.userModel.findById(sanitizedId);
+    if (!currentUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Validate that at least one of email or phone will remain after update
+    const updatedEmail =
+      updateUserDto.email !== undefined
+        ? updateUserDto.email
+        : currentUser.email;
+    const updatedPhone =
+      updateUserDto.phone !== undefined
+        ? updateUserDto.phone
+        : currentUser.phone;
+
+    if (!updatedEmail && !updatedPhone) {
+      throw new BadRequestException(
+        'At least one of email or phone number is required',
+      );
+    }
+
+    // Prepare update operations
+    const setFields: any = {};
+    const unsetFields: any = {};
+
+    // Separate fields to set vs unset
+    Object.keys(updateUserDto).forEach((key) => {
+      const value = updateUserDto[key];
+      if (value === undefined || value === null) {
+        unsetFields[key] = ''; // MongoDB $unset syntax
+      } else {
+        setFields[key] = value;
+      }
+    });
+
+    // Build update object
+    const updateOperation: any = {};
+    if (Object.keys(setFields).length > 0) {
+      updateOperation.$set = setFields;
+    }
+    if (Object.keys(unsetFields).length > 0) {
+      updateOperation.$unset = unsetFields;
+    }
+
     const user = await this.userModel
-      .findByIdAndUpdate(sanitizedId, updateUserDto, {
+      .findByIdAndUpdate(sanitizedId, updateOperation, {
         new: true,
-        runValidators: true,
+        runValidators: false, // Skip validators for null values
       })
       .select('-password')
       .exec();
@@ -155,12 +244,69 @@ export class UsersService {
 
     // Track profile update
     await this.analyticsService.trackEvent({
-      event_type: 'profile_updated' as EventType,
+      event_type: EventType.PROFILE_UPDATED,
       user_id: sanitizedId,
       metadata: { updated_fields: Object.keys(updateUserDto) },
     });
 
     return user;
+  }
+
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    // Validate and sanitize ObjectId
+    const sanitizedId = sanitizeObjectId(userId);
+    if (!sanitizedId) {
+      throw new BadRequestException('Invalid user ID format');
+    }
+
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    // Validate current password:
+    const user = await this.userModel
+      .findById(sanitizedId)
+      .select('+password')
+      .lean()
+      .exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const isPasswordValid = await PasswordUtils.comparePassword(
+      currentPassword,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Validate new password:
+    const passwordValidation =
+      PasswordUtils.validatePasswordStrength(newPassword);
+    if (!passwordValidation.isValid) {
+      throw new BadRequestException({
+        message: 'Password does not meet security requirements',
+        feedback: passwordValidation.feedback,
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await PasswordUtils.hashPassword(newPassword);
+
+    // Update password
+    await this.userModel.findByIdAndUpdate(sanitizedId, {
+      password: hashedPassword,
+    });
+
+    // Track password change
+    await this.analyticsService.trackEvent({
+      event_type: EventType.PASSWORD_CHANGED,
+      user_id: sanitizedId,
+      metadata: { timestamp: new Date() },
+    });
+
+    return { message: 'Password changed successfully' };
   }
 
   async remove(id: string): Promise<void> {
@@ -185,7 +331,7 @@ export class UsersService {
         $or: [
           { full_name: safeRegex },
           { username: safeRegex },
-          { phone_number: safeRegex },
+          { phone: safeRegex },
           { email: safeRegex },
         ],
       })

@@ -7,6 +7,7 @@ const username = ref('');
 const phoneNumber = ref('');
 const password = ref('');
 const confirmPassword = ref('');
+const email = ref('');
 const errorMessage = ref('');
 const isLoading = ref(false);
 
@@ -23,25 +24,31 @@ const handleRegister = async () => {
     return;
   }
 
-  if (password.value.length < 6) {
-    errorMessage.value = 'Password must be at least 6 characters';
+  if (password.value.length < 8) {
+    errorMessage.value = 'Password must be at least 8 characters';
     return;
   }
 
   isLoading.value = true;
 
   try {
-    // TODO: Replace with actual API call
-    const response = await fetch('http://localhost:3000/auth/signup', {
+    const requestBody: any = {
+      username: username.value,
+      phone: phoneNumber.value,
+      password: password.value,
+    };
+    
+    // Only include email if it has a value
+    if (email.value && email.value.trim()) {
+      requestBody.email = email.value;
+    }
+    
+    const response = await fetch('http://localhost:3000/api/v1/auth/signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        username: username.value,
-        phone: phoneNumber.value,
-        password: password.value,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -122,6 +129,17 @@ const goToLogin = () => {
             />
           </div>
 
+          <div class="form-group">
+            <label for="email-address">Email (Optional)</label>
+            <input
+              id="email-address"
+              v-model="email"
+              type="email"
+              placeholder="Enter your email address"
+              :disabled="isLoading"
+              autocomplete="email"
+            />
+          </div>
           <div v-if="errorMessage" class="error-message">
             {{ errorMessage }}
           </div>

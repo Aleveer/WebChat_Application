@@ -1,8 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
-// Định nghĩa Type cho receiver_type
-export type ReceiverType = 'user' | 'group';
+// Định nghĩa Enum cho receiver_type
+export enum ReceiverType {
+  USER = 'user',
+  GROUP = 'group',
+}
 
 export type MessageDocument = HydratedDocument<Message>;
 
@@ -18,8 +21,8 @@ export class Message {
   receiver_type: ReceiverType;
 
   // receiver_id có thể là User ID hoặc Group ID. Cần xử lý logic này ở tầng service/app.
-  @Prop({ type: Types.ObjectId, required: true }) 
-  receiverId: Types.ObjectId; 
+  @Prop({ type: Types.ObjectId, required: true })
+  receiverId: Types.ObjectId;
 
   @Prop({ required: true })
   text: string;

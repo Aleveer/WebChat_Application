@@ -71,7 +71,7 @@ export const ImageUrlSchema = z
   .string()
   .url('URL không hợp lệ')
   .regex(
-    APP_CONSTANTS.USERS.PROFILE_PHOTO_REGEX,
+    APP_CONSTANTS.USERS.PHOTO_REGEX,
     'URL ảnh phải có định dạng .jpg, .jpeg, .png, .gif hoặc .webp',
   );
 
@@ -176,7 +176,7 @@ export class ValidationUtils {
    * @returns true nếu hợp lệ
    */
   static isValidImageUrl(url: string): boolean {
-    const imageRegex = APP_CONSTANTS.USERS.PROFILE_PHOTO_REGEX;
+    const imageRegex = APP_CONSTANTS.USERS.PHOTO_REGEX;
     return imageRegex.test(url) && this.isValidUrl(url);
   }
 

@@ -26,11 +26,10 @@ export const APP_CONSTANTS = {
     MAX_NAME_LENGTH: 100,
     MAX_USERNAME_LENGTH: 50,
     PHONE_REGEX: /^\+[1-9]\d{1,14}$/, // Hỗ trợ tối đa 15 số theo ITU-T E.164
-    PROFILE_PHOTO_REGEX:
-      /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?(#.*)?$/i, // Hỗ trợ query params và fragments
+    PHOTO_REGEX: /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?(#.*)?$/i, // Hỗ trợ query params và fragments
     EMAIL_REGEX: /^(?!.*\.\.)[^\s@]+@[^\s@]+\.[^\s@]+$/, // Email validation - prevents consecutive dots
     USERNAME_REGEX: /^[a-zA-Z0-9_]+$/, // Only alphanumeric and underscores
-    FULL_NAME_REGEX: /^[a-zA-Z\s]+$/, // Only letters and spaces
+    FULL_NAME_REGEX: /^[\p{L}\s]+$/u, // Unicode letters and spaces - supports Vietnamese, Chinese, etc.
     PASSWORD_REGEX: /^[a-zA-Z0-9!@#$%^&*()_+=\-[\]{}|;:'",.<>?/\\`~]+$/, // Alphanumeric and common special characters
   },
 
@@ -81,7 +80,7 @@ export const ERROR_MESSAGES = {
   USER_NOT_FOUND: 'User not found',
   USER_ALREADY_EXISTS: 'User already exists',
   INVALID_CREDENTIALS: 'Invalid credentials',
-  PHONE_NUMBER_EXISTS: 'Phone number already exists',
+  PHONE_EXISTS: 'Phone number already exists',
 
   GROUP_NOT_FOUND: 'Group not found',
   NOT_GROUP_MEMBER: 'You are not a member of this group',
