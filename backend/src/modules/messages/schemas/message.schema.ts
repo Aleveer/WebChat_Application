@@ -21,7 +21,7 @@ export class Message {
   receiver_type: ReceiverType;
 
   // receiver_id có thể là User ID hoặc Group ID. Cần xử lý logic này ở tầng service/app.
-  @Prop({ type: Types.ObjectId, required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   receiverId: Types.ObjectId;
 
   @Prop({ required: true })

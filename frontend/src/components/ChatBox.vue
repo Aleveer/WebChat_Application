@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useSocket } from '../composables/useSocket';
 import ChatSidebar from './ChatSidebar.vue';
 
-const { messages, isConnected, joinChat, loadMessageHistory, sendMessage } = useSocket();
+const { messages, isConnected, sendMessage } = useSocket();
 
 const currentUser = ref('');
 const recipient = ref('');
@@ -21,11 +21,6 @@ const conversationMessages = computed(() => {
 
 const login = () => {
   if (currentUser.value.trim()) {
-    joinChat(currentUser.value);
-    // Don't require recipient at login - can select from sidebar
-    if (recipient.value.trim()) {
-      loadMessageHistory(currentUser.value, recipient.value);
-    }
     showLoginForm.value = false;
   }
 };
@@ -45,7 +40,6 @@ const logout = () => {
 
 const selectConversation = (username: string) => {
   recipient.value = username;
-  loadMessageHistory(currentUser.value, username);
 };
 </script>
 
@@ -104,7 +98,6 @@ const selectConversation = (username: string) => {
           <p class="hint">or enter a username in the field below to start a new chat</p>
           <input
             v-model="recipient"
-            @keyup.enter="() => recipient && loadMessageHistory(currentUser, recipient)"
             placeholder="Enter username to chat with..."
             class="new-chat-input"
           />

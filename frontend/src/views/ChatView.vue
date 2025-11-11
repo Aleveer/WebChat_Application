@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSocket } from '../composables/useSocket';
 import ChatSidebar from '../components/ChatSidebar.vue';
@@ -65,7 +65,7 @@ const fetchConversations = async () => {
   try {
     const token = localStorage.getItem('access_token');
     const response = await fetch(
-      `http://localhost:3000/chat/conversations?userId=${currentUserId.value}&limit=20`,
+      `http://localhost:3000/api/v1/chat/conversations?userId=${currentUserId.value}&limit=20`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -74,7 +74,10 @@ const fetchConversations = async () => {
     );
 
     if (response.ok) {
-      conversations.value = await response.json();
+      const payload = await response.json();
+      // Unwrap payload if ResponseTransformInterceptor wraps responses in { data }
+      const list = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      conversations.value = list;
       console.log('Conversations loaded:', conversations.value);
     } else {
       console.error('Failed to fetch conversations:', response.statusText);
@@ -91,7 +94,7 @@ const loadMessagesFromAPI = async (conversationId: string) => {
   try {
     const token = localStorage.getItem('access_token');
     const response = await fetch(
-      `http://localhost:3000/chat/messages/${conversationId}?limit=50`,
+      `http://localhost:3000/api/v1/chat/messages/${conversationId}?limit=50`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -100,30 +103,25 @@ const loadMessagesFromAPI = async (conversationId: string) => {
     );
 
     if (response.ok) {
-      const result = await response.json();
+      const payload = await response.json();
+      const result = payload?.data ?? payload;
       console.log('Messages loaded from API:', result);
       
             // Map server messages to client Message interface { id, from, to, content, timestamp }
-      const mappedMessages = (result.messages || []).map((msg: any) => {
+      const mappedMessages = (result?.messages || []).map((msg: any) => {
         // Server returns: _id, senderId (populated object), receiverId (populated object), text, createdAt
         const senderId = msg.senderId;
         const receiverId = msg.receiverId;
         
-        // Extract sender username
-        let senderUsername = '';
-        if (typeof senderId === 'object' && senderId) {
-          senderUsername = senderId.username || '';
-        } else if (typeof senderId === 'string') {
-          senderUsername = senderId; // Fallback if not populated
-        }
-        
-        // Extract receiver username
-        let receiverUsername = '';
-        if (typeof receiverId === 'object' && receiverId) {
-          receiverUsername = receiverId.username || '';
-        } else if (typeof receiverId === 'string') {
-          receiverUsername = receiverId; // Fallback if not populated
-        }
+        // Map to usernames using known currentUser/recipient when API sends only ObjectIds
+        const senderUsername =
+          typeof senderId === 'object' && senderId
+            ? (senderId.username || '')
+            : (senderId === currentUserId.value ? currentUser.value : recipient.value);
+        const receiverUsername =
+          typeof receiverId === 'object' && receiverId
+            ? (receiverId.username || '')
+            : (receiverId === currentUserId.value ? currentUser.value : recipient.value);
         
         return {
           id: msg._id || msg.id,
@@ -134,9 +132,10 @@ const loadMessagesFromAPI = async (conversationId: string) => {
         };
       });
       
-      messages.value = mappedMessages;
+      messages.value.splice(0, messages.value.length, ...mappedMessages);
+
       console.log('Mapped messages:', mappedMessages);
-      
+      scrollToBottom();
       return result;
     } else {
       console.error('Failed to fetch messages:', response.statusText);
@@ -207,7 +206,7 @@ const send = async () => {
       if (!recipientId.value && recipient.value) {
         // Search for user to get their ID
         const searchResponse = await fetch(
-          `http://localhost:3000/users/search?q=${encodeURIComponent(recipient.value)}`,
+          `http://localhost:3000/api/v1/users/search?q=${encodeURIComponent(recipient.value)}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -216,7 +215,8 @@ const send = async () => {
         );
         
         if (searchResponse.ok) {
-          const users = await searchResponse.json();
+          const payloadUsers = await searchResponse.json();
+          const users = Array.isArray(payloadUsers) ? payloadUsers : (payloadUsers?.data ?? []);
           const targetUser = users.find((u: any) => u.username === recipient.value);
           if (targetUser) {
             recipientId.value = targetUser._id;
@@ -231,7 +231,7 @@ const send = async () => {
       // For new conversations, we need a different endpoint that accepts receiverId
       // Let's create a temporary conversation first by sending the receiverId
       // The server sendMessage will create the conversation
-      const createResponse = await fetch('http://localhost:3000/chat/message-new', {
+      const createResponse = await fetch('http://localhost:3000/api/v1/chat/message-new', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -246,7 +246,8 @@ const send = async () => {
       });
       
       if (createResponse.ok) {
-        const result = await createResponse.json();
+        const payloadCreated = await createResponse.json();
+        const result = payloadCreated?.data ?? payloadCreated;
         console.log('New conversation created:', result);
         
         // Set the conversationId and join the room
@@ -255,11 +256,11 @@ const send = async () => {
         
         // Add message to UI immediately
         const newMsg = {
-          id: result.message._id || Date.now().toString(),
+          id: (result.message && (result.message._id || result.message.id)) || Date.now().toString(),
           from: currentUser.value,
           to: recipient.value,
           content: messageContent,
-          timestamp: new Date(result.message.createdAt || Date.now()),
+          timestamp: new Date((result.message && result.message.createdAt) || Date.now()),
         };
         
         messages.value.push(newMsg);
@@ -274,7 +275,7 @@ const send = async () => {
       return;
     }
     
-    const response = await fetch('http://localhost:3000/chat/message', {
+    const response = await fetch('http://localhost:3000/api/v1/chat/message', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -284,24 +285,25 @@ const send = async () => {
     });
 
     if (response.ok) {
-      const result = await response.json();
+      const payloadRes = await response.json();
+      const result = payloadRes?.data ?? payloadRes;
       console.log('Message sent:', result);
       
       // Add message to UI immediately for real-time display
       const newMsg = {
-        id: result.message._id || Date.now().toString(),
+        id: (result.message && (result.message._id || result.message.id)) || Date.now().toString(),
         from: currentUser.value,
         to: recipient.value,
         content: messageContent,
-        timestamp: new Date(result.message.createdAt || Date.now()),
+        timestamp: new Date((result.message && result.message.createdAt) || Date.now()),
       };
       
       // Check if message doesn't already exist (avoid duplicates)
       const exists = messages.value.some(msg => msg.id === newMsg.id);
       if (!exists) {
         messages.value.push(newMsg);
+        scrollToBottom();
       }
-      
       // Refresh conversations to update last message in sidebar
       await fetchConversations();
     } else {
@@ -519,7 +521,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="messages-container">
+        <div class="messages-container" ref="messagesContainer">
           <div
             v-for="(msg, index) in conversationMessages"
             :key="index"
