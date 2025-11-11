@@ -105,7 +105,6 @@ export class ChatService {
 
     // ==================== SEND MESSAGE ====================
     async sendMessage(senderId: string, receiverId: string, content: string, type: string = 'text') {
-        console.log("CALLING SEND MESSAGE.....")
         const senderObjectId = new Types.ObjectId(senderId);
         const receiverObjectId = new Types.ObjectId(receiverId);
 
@@ -133,8 +132,6 @@ export class ChatService {
             text: content
         });
 
-        console.log('✅ Message created:', message._id);
-
         // 3️⃣ POPULATE SENDER INFO
         await message.populate('senderId', 'username avatar');
 
@@ -160,15 +157,34 @@ export class ChatService {
 
         // 6️⃣ EMIT TO CONVERSATION ROOM via WebSocket
         if (this.chatGateway && this.chatGateway.emitMessageToConversation) {
+            // Get sender username from populated senderId
+            const senderUsername = typeof message.senderId === 'object' && message.senderId 
+                ? (message.senderId as any).username 
+                : message.senderId;
+            
+            // Get receiver username - need to fetch it
+            const receiverUser = await this.userModel.findById(receiverId).select('username');
+            const receiverUsername = receiverUser?.username || receiverId;
+      
             const messageForClient = {
                 id: message._id.toString(),
-                from: message.senderId,
-                to: receiverId,
+                from: senderUsername,
+                to: receiverUsername,
                 content: message.text,
                 timestamp: message.createdAt,
-                conversationId: conversation._id,
+                conversationId: (conversation._id as Types.ObjectId).toString(),
             };
-            this.chatGateway.emitMessageToConversation(conversation._id, messageForClient);
+            
+            console.log('📤 Emitting message to clients:', messageForClient);
+            
+            // Emit to conversation room (for users who have joined the conv)
+            this.chatGateway.emitMessageToConversation((conversation._id as Types.ObjectId).toString(), messageForClient);
+            
+            // ALSO emit to receiver's user room (fallback for users not in conv room yet)
+            if (this.chatGateway.emitMessageToUser) {
+                console.log('📤 Emitting to user room for receiverId:', receiverId);
+                this.chatGateway.emitMessageToUser(receiverId, messageForClient);
+            }
         }
 
         return {

@@ -5,13 +5,17 @@ import type { Message } from '../types/message';
 export function useSocket() {
   // Include JWT in the socket handshake auth so the server can authenticate the socket
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const socket: Socket = io('http://192.168.0.165:3000', {
+  const socket: Socket = io('http://localhost:3000', {
     auth: {
       token,
     },
   });
   const messages = ref<Message[]>([]);
   const isConnected = ref(false);
+
+  // Callback for when a new message is received
+  let onMessageCallback: ((message: Message) => void) | null = null;
+
 
   socket.on('connect', () => {
     console.log('Connected to server');
@@ -30,7 +34,17 @@ export function useSocket() {
     if (!exists) {
       messages.value.push(message);
     }
+
+    // Call the callback if registered (for conversation list refresh)
+    if (onMessageCallback) {
+      onMessageCallback(message);
+    }
   });
+
+
+  const setOnMessageCallback = (callback: (message: Message) => void) => {
+    onMessageCallback = callback;
+  };
 
   // const joinChat = (username: string) => {
   //   socket.emit('join', username);
@@ -67,5 +81,6 @@ export function useSocket() {
     joinConversation,
     leaveConversation,
     sendMessage,
+    setOnMessageCallback,
   };
 }

@@ -29,7 +29,7 @@ interface ApiConversation {
 
 const router = useRouter();
 //join chat remove
-const { messages, isConnected, joinConversation, leaveConversation, sendMessage } = useSocket();
+const { messages, isConnected, joinConversation, leaveConversation, sendMessage, setOnMessageCallback } = useSocket();
 
 const currentUser = ref('');
 const currentUserId = ref('');
@@ -41,6 +41,21 @@ const showProfileDropdown = ref(false);
 const showProfileSettings = ref(false);
 const conversations = ref<ApiConversation[]>([]);
 const isLoadingConversations = ref(false);
+const messagesContainer = ref<HTMLElement | null>(null);
+
+// Auto-scroll to bottom when messages change
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    }
+  });
+};
+
+// Watch for new messages and auto-scroll
+watch(() => messages.value.length, () => {
+  scrollToBottom();
+});
 
 // Fetch conversations from API
 const fetchConversations = async () => {
@@ -88,50 +103,32 @@ const loadMessagesFromAPI = async (conversationId: string) => {
       const result = await response.json();
       console.log('Messages loaded from API:', result);
       
-      // Map server messages to client Message interface { id, from, to, content, timestamp }
+            // Map server messages to client Message interface { id, from, to, content, timestamp }
       const mappedMessages = (result.messages || []).map((msg: any) => {
-        // Server returns: _id, senderId (may be populated), receiverId, text, createdAt
+        // Server returns: _id, senderId (populated object), receiverId (populated object), text, createdAt
         const senderId = msg.senderId;
         const receiverId = msg.receiverId;
         
-        // Determine sender name
-        let fromName = '';
+        // Extract sender username
+        let senderUsername = '';
         if (typeof senderId === 'object' && senderId) {
-          fromName = senderId.username || senderId.name || '';
+          senderUsername = senderId.username || '';
         } else if (typeof senderId === 'string') {
-          fromName = senderId;
+          senderUsername = senderId; // Fallback if not populated
         }
         
-        // If this is our message, use currentUser
-        if (senderId && currentUserId.value) {
-          const senderIdStr = typeof senderId === 'object' ? senderId._id : senderId;
-          if (String(senderIdStr) === String(currentUserId.value)) {
-            fromName = currentUser.value;
-          }
-        }
-        
-        // Determine receiver name
-        let toName = '';
+        // Extract receiver username
+        let receiverUsername = '';
         if (typeof receiverId === 'object' && receiverId) {
-          toName = receiverId.username || receiverId.name || '';
+          receiverUsername = receiverId.username || '';
         } else if (typeof receiverId === 'string') {
-          toName = receiverId;
-        }
-        
-        // If receiver is current user, use recipient name for "to"
-        if (receiverId && currentUserId.value) {
-          const receiverIdStr = typeof receiverId === 'object' ? receiverId._id : receiverId;
-          if (String(receiverIdStr) === String(currentUserId.value)) {
-            toName = currentUser.value;
-          } else if (recipient.value) {
-            toName = recipient.value;
-          }
+          receiverUsername = receiverId; // Fallback if not populated
         }
         
         return {
           id: msg._id || msg.id,
-          from: fromName,
-          to: toName || recipient.value,
+          from: senderUsername,
+          to: receiverUsername,
           content: msg.text || msg.content || '',
           timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
         };
@@ -154,12 +151,15 @@ const loadMessagesFromAPI = async (conversationId: string) => {
 // Filter messages for current conversation
 const conversationMessages = computed(() => {
   if (!recipient.value) return [];
-  
-  return messages.value.filter(
+  const filtered = messages.value.filter(
     (msg) =>
       (msg.from === currentUser.value && msg.to === recipient.value) ||
       (msg.from === recipient.value && msg.to === currentUser.value)
   );
+  
+  console.log('✅ Filtered messages:', filtered.length, filtered);
+  
+  return filtered;
 });
 
 // Check if there are any conversations
@@ -259,10 +259,11 @@ const send = async () => {
           from: currentUser.value,
           to: recipient.value,
           content: messageContent,
-          timestamp: new Date(),
+          timestamp: new Date(result.message.createdAt || Date.now()),
         };
         
         messages.value.push(newMsg);
+        scrollToBottom();
         
         // Refresh conversations to show this new conversation
         await fetchConversations();
@@ -292,7 +293,7 @@ const send = async () => {
         from: currentUser.value,
         to: recipient.value,
         content: messageContent,
-        timestamp: new Date(),
+        timestamp: new Date(result.message.createdAt || Date.now()),
       };
       
       // Check if message doesn't already exist (avoid duplicates)
@@ -356,6 +357,7 @@ const selectConversation = async (username: string) => {
     console.log('Selected existing conversation:', activeConversationId.value);
     
     // Join the conversation room via WebSocket
+    console.log('Join conversation:');
     joinConversation(conv.conversationId);
     
     // Load message history from API
@@ -450,6 +452,12 @@ onMounted(async () => {
       console.error('Error parsing token:', error);
     }
   }
+
+  // Register callback to refresh conversation list when new message arrives
+  setOnMessageCallback(async (message) => {
+    console.log('New message received, refreshing conversation list...');
+    await fetchConversations();
+  });
 
   // Close dropdown when clicking outside
   document.addEventListener('click', (e) => {
