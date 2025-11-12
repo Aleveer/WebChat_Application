@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router';
 import { useSocket } from '../composables/useSocket';
 import ChatSidebar from '../components/ChatSidebar.vue';
 import ProfileSettings from '../components/ProfileSettings.vue';
+import GroupMembersPanel from '../components/GroupMembersPanel.vue';
+import CreateGroupModal from '../components/CreateGroupModal.vue';
+import type { Message } from '../types/message';
 
 interface ApiConversation {
   conversationId: string;
@@ -17,70 +20,167 @@ interface ApiConversation {
     status?: string;
     lastSeen?: string;
   };
-  lastMessage: {
-    content: string;
-    senderId: string;
-    createdAt: string;
-    type: string;
+  lastMessage?: {
+    content?: string;
+    senderId?: string;
+    senderName?: string;
+    createdAt?: string;
+    type?: string;
   };
-  unreadCount: Record<string, number>;
-  lastMessageAt: string;
+  unreadCount?: Record<string, number> | number;
+  lastMessageAt?: string;
+}
+
+interface SelectedConversation {
+  id?: string;
+  type: 'direct' | 'group';
+  name: string;
+  chatInfo: ApiConversation['chatInfo'];
+  groupId?: string;
+  userId?: string;
+  isNew?: boolean;
+}
+
+interface PopulatedUser {
+  _id: string;
+  username?: string;
+  full_name?: string;
+  email?: string;
+  photo?: string;
+}
+
+interface GroupMember {
+  user_id: PopulatedUser | string;
+  is_admin: boolean;
+  removed_at?: string | null;
+  joined_at?: string;
+}
+
+interface GroupDetails {
+  _id: string;
+  name: string;
+  members: GroupMember[];
+  conversation_id?: string | { _id: string };
 }
 
 const router = useRouter();
-//join chat remove
-const { messages, isConnected, joinConversation, leaveConversation, sendMessage, setOnMessageCallback } = useSocket();
+const {
+  messages,
+  isConnected,
+  joinConversation,
+  leaveConversation,
+  setOnMessageCallback,
+} = useSocket();
 
 const currentUser = ref('');
 const currentUserId = ref('');
-const recipient = ref('');
-const recipientId = ref('');
-const activeConversationId = ref(''); // Store active conversation ID
+const selectedConversation = ref<SelectedConversation | null>(null);
+const activeConversationRaw = ref<ApiConversation | null>(null);
+const activeConversationId = ref('');
 const newMessage = ref('');
 const showProfileDropdown = ref(false);
 const showProfileSettings = ref(false);
 const conversations = ref<ApiConversation[]>([]);
 const isLoadingConversations = ref(false);
 const messagesContainer = ref<HTMLElement | null>(null);
+const activeGroup = ref<GroupDetails | null>(null);
+const isLoadingGroup = ref(false);
+const showCreateGroupModal = ref(false);
+const groupActionLoading = ref(false);
 
-// Auto-scroll to bottom when messages change
+const userInitials = computed(() =>
+  currentUser.value ? currentUser.value.charAt(0).toUpperCase() : '?',
+);
+
+const conversationMessages = computed(() => {
+  if (!activeConversationId.value) return [];
+  return messages.value.filter(
+    (msg) => msg.conversationId === activeConversationId.value,
+  );
+});
+
+const hasConversations = computed(
+  () => conversations.value.length > 0 || conversationMessages.value.length > 0,
+);
+
+const conversationTitle = computed(
+  () => selectedConversation.value?.name ?? '',
+);
+
+const isGroupConversation = computed(
+  () => selectedConversation.value?.type === 'group',
+);
+
+const isCurrentUserGroupAdmin = computed(() => {
+  if (!activeGroup.value || !currentUserId.value) return false;
+  return activeGroup.value.members.some((member) => {
+    const memberId =
+      typeof member.user_id === 'string'
+        ? member.user_id
+        : member.user_id?._id;
+    return (
+      memberId === currentUserId.value &&
+      member.is_admin &&
+      (member.removed_at === null || member.removed_at === undefined)
+    );
+  });
+});
+
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      messagesContainer.value.scrollTop =
+        messagesContainer.value.scrollHeight;
     }
   });
 };
 
-// Watch for new messages and auto-scroll
-watch(() => messages.value.length, () => {
-  scrollToBottom();
-});
+const formatTime = (value: Date | string) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
-// Fetch conversations from API
+watch(
+  () => messages.value.length,
+  () => {
+    scrollToBottom();
+  },
+);
+
+const authorizedFetch = async (
+  input: RequestInfo,
+  init: RequestInit = {},
+) => {
+  const token = localStorage.getItem('access_token');
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  return fetch(input, {
+    ...init,
+    headers,
+  });
+};
+
 const fetchConversations = async () => {
   if (!currentUserId.value) return;
-  
+
   isLoadingConversations.value = true;
   try {
-    const token = localStorage.getItem('access_token');
-    const response = await fetch(
-      `http://localhost:3000/api/v1/chat/conversations?userId=${currentUserId.value}&limit=20`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }
+    const response = await authorizedFetch(
+      `http://localhost:3000/api/v1/chat/conversations?userId=${currentUserId.value}&limit=50`,
     );
-
     if (response.ok) {
       const payload = await response.json();
-      // Unwrap payload if ResponseTransformInterceptor wraps responses in { data }
-      const list = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      const list = Array.isArray(payload) ? payload : payload?.data ?? [];
       conversations.value = list;
-      console.log('Conversations loaded:', conversations.value);
-    } else {
-      console.error('Failed to fetch conversations:', response.statusText);
     }
   } catch (error) {
     console.error('Error fetching conversations:', error);
@@ -89,232 +189,234 @@ const fetchConversations = async () => {
   }
 };
 
-// Fetch message history from API
-const loadMessagesFromAPI = async (conversationId: string) => {
+const fetchGroupDetails = async (groupId?: string) => {
+  if (!groupId) {
+    activeGroup.value = null;
+    return;
+  }
+  isLoadingGroup.value = true;
   try {
-    const token = localStorage.getItem('access_token');
-    const response = await fetch(
-      `http://localhost:3000/api/v1/chat/messages/${conversationId}?limit=50`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      }
+    const response = await authorizedFetch(
+      `http://localhost:3000/api/v1/groups/${groupId}`,
     );
-
     if (response.ok) {
       const payload = await response.json();
-      const result = payload?.data ?? payload;
-      console.log('Messages loaded from API:', result);
-      
-            // Map server messages to client Message interface { id, from, to, content, timestamp }
-      const mappedMessages = (result?.messages || []).map((msg: any) => {
-        // Server returns: _id, senderId (populated object), receiverId (populated object), text, createdAt
-        const senderId = msg.senderId;
-        const receiverId = msg.receiverId;
-        
-        // Map to usernames using known currentUser/recipient when API sends only ObjectIds
-        const senderUsername =
-          typeof senderId === 'object' && senderId
-            ? (senderId.username || '')
-            : (senderId === currentUserId.value ? currentUser.value : recipient.value);
-        const receiverUsername =
-          typeof receiverId === 'object' && receiverId
-            ? (receiverId.username || '')
-            : (receiverId === currentUserId.value ? currentUser.value : recipient.value);
-        
-        return {
-          id: msg._id || msg.id,
-          from: senderUsername,
-          to: receiverUsername,
-          content: msg.text || msg.content || '',
-          timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
-        };
-      });
-      
-      messages.value.splice(0, messages.value.length, ...mappedMessages);
-
-      console.log('Mapped messages:', mappedMessages);
-      scrollToBottom();
-      return result;
-    } else {
-      console.error('Failed to fetch messages:', response.statusText);
-      messages.value = [];
+      activeGroup.value = payload?.data ?? payload;
     }
   } catch (error) {
-    console.error('Error fetching messages:', error);
-    messages.value = [];
+    console.error('Error fetching group details:', error);
+    activeGroup.value = null;
+  } finally {
+    isLoadingGroup.value = false;
   }
 };
 
-// Filter messages for current conversation
-const conversationMessages = computed(() => {
-  if (!recipient.value) return [];
-  const filtered = messages.value.filter(
-    (msg) =>
-      (msg.from === currentUser.value && msg.to === recipient.value) ||
-      (msg.from === recipient.value && msg.to === currentUser.value)
+const loadMessagesFromAPI = async (
+  conversationId: string,
+  conversationType: 'direct' | 'group',
+) => {
+  try {
+    const response = await authorizedFetch(
+      `http://localhost:3000/api/v1/chat/messages/${conversationId}?limit=100`,
+    );
+    if (!response.ok) {
+      throw new Error('Failed to fetch messages');
+    }
+    const payload = await response.json();
+    const result = payload?.data ?? payload;
+    const targetName = selectedConversation.value?.name ?? '';
+
+    const mappedMessages: Message[] = (result?.messages || []).map(
+      (msg: any) => {
+        const sender = msg.senderId;
+        const senderId =
+          typeof sender === 'object' && sender
+            ? sender._id
+            : sender?.toString?.() || '';
+        const senderName =
+          (typeof sender === 'object' && sender?.username) ||
+          (senderId === currentUserId.value ? currentUser.value : targetName) ||
+          senderId;
+
+        return {
+          id: msg._id || msg.id,
+          conversationId,
+          type: conversationType,
+          from: senderName,
+          to: conversationType === 'group' ? targetName : targetName,
+          content: msg.text || msg.content || '',
+          timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+          groupId:
+            conversationType === 'group'
+              ? selectedConversation.value?.groupId
+              : undefined,
+        };
+      },
+    );
+
+    const remaining = messages.value.filter(
+      (message) => message.conversationId !== conversationId,
+    );
+    messages.value = [...remaining, ...mappedMessages];
+    scrollToBottom();
+  } catch (error) {
+    console.error('Error loading messages:', error);
+  }
+};
+
+const handleSelectConversation = async (conversation: ApiConversation) => {
+  activeConversationRaw.value = conversation;
+  selectedConversation.value = {
+    id: conversation.conversationId,
+    type: conversation.type,
+    name:
+      conversation.type === 'group'
+        ? conversation.chatInfo.name || 'Nhóm chưa đặt tên'
+        : conversation.chatInfo.username || 'Người dùng',
+    chatInfo: conversation.chatInfo,
+    groupId: conversation.chatInfo.groupId,
+    userId: conversation.chatInfo.userId,
+    isNew: false,
+  };
+
+  if (activeConversationId.value) {
+    leaveConversation(activeConversationId.value);
+  }
+
+  activeConversationId.value = conversation.conversationId;
+  joinConversation(conversation.conversationId);
+  await loadMessagesFromAPI(
+    conversation.conversationId,
+    conversation.type,
   );
-  
-  console.log('✅ Filtered messages:', filtered.length, filtered);
-  
-  return filtered;
-});
 
-// Check if there are any conversations
-const hasConversations = computed(() => {
-  return conversations.value.length > 0 || messages.value.length > 0;
-});
+  if (conversation.type === 'group') {
+    await fetchGroupDetails(conversation.chatInfo.groupId);
+  } else {
+    activeGroup.value = null;
+  }
+};
 
-// Get user initials for avatar
-const userInitials = computed(() => {
-  return currentUser.value ? currentUser.value.charAt(0).toUpperCase() : '?';
-});
-
-// Format time without seconds (HH:MM format)
-const formatTime = (timestamp: Date) => {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
+const startNewChat = (user: {
+  _id: string;
+  username: string;
+  phone?: string;
+  photo?: string;
+}) => {
+  if (activeConversationId.value) {
+    leaveConversation(activeConversationId.value);
+  }
+  activeConversationId.value = '';
+  activeConversationRaw.value = null;
+  activeGroup.value = null;
+  selectedConversation.value = {
+    type: 'direct',
+    name: user.username,
+    chatInfo: { username: user.username, userId: user._id },
+    userId: user._id,
+    isNew: true,
+  };
+  newMessage.value = '';
 };
 
 const send = async () => {
-  if (!newMessage.value.trim()) return;
+  if (!newMessage.value.trim() || !selectedConversation.value) {
+    return;
+  }
 
-  const messageContent = newMessage.value;
-  newMessage.value = ''; // Clear input immediately for better UX
+  const content = newMessage.value.trim();
+  newMessage.value = '';
 
   try {
-    const token = localStorage.getItem('access_token');
-    
-    // If no activeConversationId (new conversation), we need to create it via the API
-    // The server will find or create the conversation
-    const payload: any = {
-      senderId: currentUserId.value,
-      content: messageContent,
-      type: 'text',
-    };
-    
-    if (activeConversationId.value) {
-      // Existing conversation - use conversationId
-      payload.conversationId = activeConversationId.value;
-    } else {
-      // New conversation - need to send to a specific user
-      // We'll search for the user first to get their ID
-      if (!recipientId.value && recipient.value) {
-        // Search for user to get their ID
-        const searchResponse = await fetch(
-          `http://localhost:3000/api/v1/users/search?q=${encodeURIComponent(recipient.value)}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-        
-        if (searchResponse.ok) {
-          const payloadUsers = await searchResponse.json();
-          const users = Array.isArray(payloadUsers) ? payloadUsers : (payloadUsers?.data ?? []);
-          const targetUser = users.find((u: any) => u.username === recipient.value);
-          if (targetUser) {
-            recipientId.value = targetUser._id;
-          } else {
-            console.error('User not found');
-            newMessage.value = messageContent; // Restore message
-            return;
-          }
-        }
-      }
-      
-      // For new conversations, we need a different endpoint that accepts receiverId
-      // Let's create a temporary conversation first by sending the receiverId
-      // The server sendMessage will create the conversation
-      const createResponse = await fetch('http://localhost:3000/api/v1/chat/message-new', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+    if (selectedConversation.value.id) {
+      const response = await authorizedFetch(
+        'http://localhost:3000/api/v1/chat/message',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            senderId: currentUserId.value,
+            conversationId: selectedConversation.value.id,
+            content,
+            type: 'text',
+          }),
         },
-        body: JSON.stringify({
-          senderId: currentUserId.value,
-          receiverId: recipientId.value,
-          content: messageContent,
-          type: 'text',
-        }),
-      });
-      
-      if (createResponse.ok) {
-        const payloadCreated = await createResponse.json();
-        const result = payloadCreated?.data ?? payloadCreated;
-        console.log('New conversation created:', result);
-        
-        // Set the conversationId and join the room
-        activeConversationId.value = result.conversationId;
-        joinConversation(result.conversationId);
-        
-        // Add message to UI immediately
-        const newMsg = {
-          id: (result.message && (result.message._id || result.message.id)) || Date.now().toString(),
-          from: currentUser.value,
-          to: recipient.value,
-          content: messageContent,
-          timestamp: new Date((result.message && result.message.createdAt) || Date.now()),
-        };
-        
-        messages.value.push(newMsg);
-        scrollToBottom();
-        
-        // Refresh conversations to show this new conversation
-        await fetchConversations();
-      } else {
-        console.error('Failed to create conversation:', createResponse.statusText);
-        newMessage.value = messageContent; // Restore message
-      }
-      return;
-    }
-    
-    const response = await fetch('http://localhost:3000/api/v1/chat/message', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
+      );
 
-    if (response.ok) {
-      const payloadRes = await response.json();
-      const result = payloadRes?.data ?? payloadRes;
-      console.log('Message sent:', result);
-      
-      // Add message to UI immediately for real-time display
-      const newMsg = {
-        id: (result.message && (result.message._id || result.message.id)) || Date.now().toString(),
-        from: currentUser.value,
-        to: recipient.value,
-        content: messageContent,
-        timestamp: new Date((result.message && result.message.createdAt) || Date.now()),
-      };
-      
-      // Check if message doesn't already exist (avoid duplicates)
-      const exists = messages.value.some(msg => msg.id === newMsg.id);
-      if (!exists) {
-        messages.value.push(newMsg);
-        scrollToBottom();
+      if (!response.ok) {
+        throw new Error('Failed to send message');
       }
-      // Refresh conversations to update last message in sidebar
+      const payload = await response.json();
+      const result = payload?.data ?? payload;
+
+      const message: Message = {
+        id:
+          (result.message && (result.message._id || result.message.id)) ||
+          Date.now().toString(),
+        conversationId: selectedConversation.value.id,
+        type: selectedConversation.value.type,
+        from: currentUser.value,
+        to: selectedConversation.value.name,
+        content,
+        timestamp: new Date(
+          (result.message && result.message.createdAt) || Date.now(),
+        ),
+        groupId: selectedConversation.value.groupId,
+      };
+
+      if (!messages.value.some((msg) => msg.id === message.id)) {
+        messages.value.push(message);
+      }
+      scrollToBottom();
+      await fetchConversations();
+    } else if (selectedConversation.value.type === 'direct') {
+      const response = await authorizedFetch(
+        'http://localhost:3000/api/v1/chat/message-new',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            senderId: currentUserId.value,
+            receiverId: selectedConversation.value.userId,
+            content,
+            type: 'text',
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create conversation');
+      }
+
+      const payload = await response.json();
+      const result = payload?.data ?? payload;
+      const conversationId = result.conversationId;
+
+      selectedConversation.value.id = conversationId;
+      activeConversationId.value = conversationId;
+      joinConversation(conversationId);
+
+      const message: Message = {
+        id:
+          (result.message && (result.message._id || result.message.id)) ||
+          Date.now().toString(),
+        conversationId,
+        type: 'direct',
+        from: currentUser.value,
+        to: selectedConversation.value.name,
+        content,
+        timestamp: new Date(
+          (result.message && result.message.createdAt) || Date.now(),
+        ),
+      };
+
+      messages.value.push(message);
+      scrollToBottom();
       await fetchConversations();
     } else {
-      console.error('Failed to send message:', response.statusText);
-      // Restore message content if failed
-      newMessage.value = messageContent;
+      throw new Error('Conversation is missing identifier');
     }
   } catch (error) {
     console.error('Error sending message:', error);
-    // Restore message content if failed
-    newMessage.value = messageContent;
+    newMessage.value = content;
   }
 };
 
@@ -342,112 +444,203 @@ const closeProfileSettings = () => {
   showProfileSettings.value = false;
 };
 
-const selectConversation = async (username: string) => {
-  recipient.value = username;
-  
-  // Try to get conversation data from API conversations
-  const conv = conversations.value.find(c => c.chatInfo.username === username);
-  if (conv) {
-    recipientId.value = conv.chatInfo.userId || '';
-    
-    // Leave previous conversation room if exists
-    if (activeConversationId.value) {
-      leaveConversation(activeConversationId.value);
-    }
-    
-    activeConversationId.value = conv.conversationId;
-    console.log('Selected existing conversation:', activeConversationId.value);
-    
-    // Join the conversation room via WebSocket
-    console.log('Join conversation:');
-    joinConversation(conv.conversationId);
-    
-    // Load message history from API
-    await loadMessagesFromAPI(conv.conversationId);
-  } else {
-    // New conversation - no conversationId yet, will be created when first message is sent
-    console.log('New conversation with:', username);
-    
-    // Clear messages for new conversation
-    messages.value = [];
-    
-    // Leave previous conversation room if exists
-    if (activeConversationId.value) {
-      leaveConversation(activeConversationId.value);
-    }
-    
-    // Clear active conversation ID - will be set when first message is sent
-    activeConversationId.value = '';
-    
-    // Try to find the user ID from search or fetch user info
-    // For now, we'll set it when sending the first message
-    recipientId.value = '';
-  }
+const openCreateGroupModal = () => {
+  showCreateGroupModal.value = true;
 };
 
-// Handle starting new chat from search results
-const startNewChat = async (user: { _id: string; username: string; phone?: string; photo?: string }) => {
-  recipient.value = user.username;
-  recipientId.value = user._id;
-  
-  // Clear messages for new conversation
-  messages.value = [];
-  
-  // Leave previous conversation room if exists
-  if (activeConversationId.value) {
-    leaveConversation(activeConversationId.value);
-  }
-  
-  // Check if conversation already exists in the list
-  const existingConv = conversations.value.find(c => c.chatInfo.userId === user._id);
-  if (existingConv) {
-    // Use existing conversation
-    activeConversationId.value = existingConv.conversationId;
-    joinConversation(existingConv.conversationId);
-    await loadMessagesFromAPI(existingConv.conversationId);
-  } else {
-    // New conversation - create it by sending first message or wait for user to send
-    // For now, just set the recipient and wait for user to send message
-    activeConversationId.value = '';
-    console.log(`Ready to start new conversation with ${user.username} (${user._id})`);
-  }
+const closeCreateGroupModal = () => {
+  showCreateGroupModal.value = false;
 };
 
 const promptNewChat = () => {
-  const recipientName = prompt('Enter username to chat with:');
-  if (recipientName && recipientName.trim()) {
-    recipient.value = recipientName.trim();
-    // Note: For new chats, we need to send a message first to create the conversation
-    // Then the conversation will appear in the list
+  openCreateGroupModal();
+};
+
+const handleCreateGroup = async (payload: {
+  name: string;
+  memberIds: string[];
+}) => {
+  try {
+    groupActionLoading.value = true;
+    const memberSet = Array.from(
+      new Set([...payload.memberIds, currentUserId.value]),
+    );
+
+    const response = await authorizedFetch(
+      'http://localhost:3000/api/v1/groups',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: payload.name,
+          members: memberSet.map((id) => ({
+            user_id: id,
+            is_admin: id === currentUserId.value,
+          })),
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Failed to create group');
+    }
+
+    const data = await response.json();
+    const group = data?.data ?? data;
+    showCreateGroupModal.value = false;
+
+    await fetchConversations();
+
+    if (group?.conversation_id) {
+      const conversationId =
+        typeof group.conversation_id === 'string'
+          ? group.conversation_id
+          : group.conversation_id?._id;
+      const newConversation: ApiConversation = {
+        conversationId,
+        type: 'group',
+        chatInfo: {
+          name: group.name,
+          groupId: group._id,
+        },
+        lastMessage: {
+          content: 'Nhóm vừa được tạo',
+          senderId: currentUserId.value,
+          senderName: currentUser.value,
+          type: 'system',
+        },
+        unreadCount: {},
+        lastMessageAt: new Date().toISOString(),
+      };
+      conversations.value = [newConversation, ...conversations.value];
+      await handleSelectConversation(newConversation);
+    }
+  } catch (error: any) {
+    console.error('Error creating group:', error);
+    alert(error.message || 'Không thể tạo nhóm. Vui lòng thử lại.');
+  } finally {
+    groupActionLoading.value = false;
+  }
+};
+
+const performGroupAction = async (
+  endpoint: string,
+  method: 'PATCH' | 'DELETE',
+  body?: Record<string, unknown>,
+) => {
+  if (!selectedConversation.value?.groupId) return;
+  try {
+    groupActionLoading.value = true;
+    const response = await authorizedFetch(endpoint, {
+      method,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Group action failed');
+    }
+    await fetchGroupDetails(selectedConversation.value.groupId);
+    await fetchConversations();
+  } catch (error: any) {
+    console.error('Group action error:', error);
+    alert(error.message || 'Thao tác thất bại');
+  } finally {
+    groupActionLoading.value = false;
+  }
+};
+
+const handleKickMember = async (userId: string) => {
+  if (!selectedConversation.value?.groupId) return;
+  await performGroupAction(
+    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}/members`,
+    'DELETE',
+    { user_id: userId },
+  );
+};
+
+const handleToggleAdmin = async (payload: {
+  userId: string;
+  isAdmin: boolean;
+}) => {
+  if (!selectedConversation.value?.groupId) return;
+  await performGroupAction(
+    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}/admin`,
+    'PATCH',
+    {
+      user_id: payload.userId,
+      is_admin: payload.isAdmin,
+    },
+  );
+};
+
+const handleRenameGroup = async (newName: string) => {
+  if (!selectedConversation.value?.groupId || !newName.trim()) return;
+  await performGroupAction(
+    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}`,
+    'PATCH',
+    { name: newName.trim() },
+  );
+  if (selectedConversation.value) {
+    selectedConversation.value.name = newName.trim();
+  }
+  if (activeConversationRaw.value?.chatInfo) {
+    activeConversationRaw.value.chatInfo.name = newName.trim();
+  }
+};
+
+const handleDeleteGroup = async () => {
+  if (!selectedConversation.value?.groupId) return;
+  const confirmDelete = confirm(
+    'Bạn chắc chắn muốn xoá nhóm này? Tất cả tin nhắn sẽ bị xoá.',
+  );
+  if (!confirmDelete) return;
+
+  try {
+    groupActionLoading.value = true;
+    const response = await authorizedFetch(
+      `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}`,
+      { method: 'DELETE' },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Không thể xoá nhóm');
+    }
+
+    if (activeConversationId.value) {
+      leaveConversation(activeConversationId.value);
+    }
+    const removedConversationId = activeConversationId.value;
+
+    selectedConversation.value = null;
+    activeConversationRaw.value = null;
+    activeConversationId.value = '';
+    activeGroup.value = null;
+    messages.value = messages.value.filter(
+      (msg) => msg.conversationId !== removedConversationId,
+    );
+    await fetchConversations();
+  } catch (error: any) {
+    console.error('Delete group failed:', error);
+    alert(error.message || 'Không thể xoá nhóm');
+  } finally {
+    groupActionLoading.value = false;
   }
 };
 
 onMounted(async () => {
-  // Check authentication - TEMPORARILY DISABLED FOR TESTING
   const token = localStorage.getItem('access_token');
   const username = localStorage.getItem('username');
-  
-  // Uncomment to enable authentication check
-  // if (!token || !username) {
-  //   router.push('/login');
-  //   return;
-  // }
-  
+
   if (username) {
     currentUser.value = username;
-    //joinChat(username);
   }
 
-  // Get user ID from token payload
   if (token) {
     try {
       const tokenParts = token.split('.');
       if (tokenParts.length === 3 && tokenParts[1]) {
         const payload = JSON.parse(atob(tokenParts[1]));
         currentUserId.value = payload.sub;
-        console.log('Current user ID:', currentUserId.value);
-        
-        // Fetch conversations from API
         await fetchConversations();
       }
     } catch (error) {
@@ -455,15 +648,18 @@ onMounted(async () => {
     }
   }
 
-  // Register callback to refresh conversation list when new message arrives
   setOnMessageCallback(async (message) => {
-    console.log('New message received, refreshing conversation list...');
     await fetchConversations();
+    if (message.conversationId === activeConversationId.value) {
+      scrollToBottom();
+      if (isGroupConversation.value && selectedConversation.value?.groupId) {
+        await fetchGroupDetails(selectedConversation.value.groupId);
+      }
+    }
   });
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
     if (!target.closest('.profile-menu')) {
       closeDropdown();
     }
@@ -478,53 +674,56 @@ onMounted(async () => {
         :messages="messages"
         :currentUser="currentUser"
         :currentUserId="currentUserId"
-        :activeRecipient="recipient"
+        :activeConversationId="activeConversationId"
         :isConnected="isConnected"
         :showProfileDropdown="showProfileDropdown"
         :apiConversations="conversations"
-        @selectConversation="selectConversation"
+        @selectConversation="handleSelectConversation"
         @startNewChat="startNewChat"
         @toggleProfile="toggleProfileDropdown"
         @logout="logout"
         @goToProfile="goToProfile"
+        @createGroup="openCreateGroupModal"
       />
 
-      <!-- Show empty state if no conversations, otherwise show chat panel -->
-      <div v-if="!hasConversations && !recipient" class="empty-state">
+      <div v-if="!hasConversations && !selectedConversation" class="empty-state">
         <div class="empty-content">
           <div class="empty-icon">💬</div>
-          <h3>No conversations yet</h3>
-          <p>Start a conversation by clicking the button below</p>
+          <h3>Chưa có cuộc trò chuyện</h3>
+          <p>Bắt đầu bằng cách tạo nhóm hoặc tìm bạn bè</p>
           <button @click="promptNewChat" class="new-chat-btn">
-            ➕ Start New Chat
+            ➕ Tạo nhóm mới
           </button>
         </div>
       </div>
 
-      <!-- Show welcome message if conversations exist but none selected -->
-      <div v-else-if="!recipient" class="no-chat-selected">
+      <div v-else-if="!selectedConversation" class="no-chat-selected">
         <div class="welcome-content">
-          <h3>👋 Welcome back, {{ currentUser }}!</h3>
-          <p>Select a conversation from the sidebar or start a new one</p>
+          <h3>👋 Chào mừng {{ currentUser }}!</h3>
+          <p>Hãy chọn một cuộc trò chuyện hoặc tạo nhóm mới</p>
           <button @click="promptNewChat" class="new-chat-input">
-            ➕ New Chat
+            ➕ Tạo nhóm
           </button>
         </div>
       </div>
 
-      <!-- Chat messages panel -->
       <div v-else class="chat-container">
         <div class="chat-recipient-header">
           <div class="recipient-info">
-            <div class="recipient-avatar">{{ recipient.charAt(0).toUpperCase() }}</div>
-            <h3>{{ recipient }}</h3>
+            <div class="recipient-avatar">
+              {{ conversationTitle.charAt(0).toUpperCase() }}
+            </div>
+            <div>
+              <h3>{{ conversationTitle }}</h3>
+              <span v-if="isGroupConversation" class="recipient-subtitle">Nhóm chat</span>
+            </div>
           </div>
         </div>
 
         <div class="messages-container" ref="messagesContainer">
           <div
-            v-for="(msg, index) in conversationMessages"
-            :key="index"
+            v-for="msg in conversationMessages"
+            :key="msg.id"
             :class="['message', msg.from === currentUser ? 'sent' : 'received']"
           >
             <div class="message-content">
@@ -542,18 +741,39 @@ onMounted(async () => {
             v-model="newMessage"
             @keyup.enter="send"
             type="text"
-            placeholder="Type a message..."
+            placeholder="Nhập tin nhắn..."
+            :disabled="!selectedConversation"
           />
-          <button @click="send" :disabled="!newMessage.trim()">Send</button>
+          <button @click="send" :disabled="!selectedConversation || !newMessage.trim()">Gửi</button>
         </div>
       </div>
+
+      <GroupMembersPanel
+        v-if="isGroupConversation && activeGroup"
+        class="group-panel"
+        :group="activeGroup"
+        :current-user-id="currentUserId"
+        :is-admin="isCurrentUserGroupAdmin"
+        :loading="isLoadingGroup || groupActionLoading"
+        @kick="handleKickMember"
+        @toggle-admin="handleToggleAdmin"
+        @rename="handleRenameGroup"
+        @delete="handleDeleteGroup"
+      />
     </div>
 
-    <!-- Profile Settings Modal -->
     <ProfileSettings
       v-if="showProfileSettings"
       :currentUserId="currentUserId"
       @close="closeProfileSettings"
+    />
+
+    <CreateGroupModal
+      :visible="showCreateGroupModal"
+      :current-user-id="currentUserId"
+      :busy="groupActionLoading"
+      @close="closeCreateGroupModal"
+      @submit="handleCreateGroup"
     />
   </div>
 </template>
@@ -566,12 +786,15 @@ onMounted(async () => {
   background: #f0f2f5;
 }
 
-/* Chat Layout */
 .chat-layout {
   display: flex;
   flex: 1;
   overflow: hidden;
   height: 100vh;
+}
+
+.group-panel {
+  width: 320px;
 }
 
 .empty-state {
@@ -703,6 +926,11 @@ onMounted(async () => {
   margin: 0;
   color: #333;
   font-size: 1.125rem;
+}
+
+.recipient-subtitle {
+  color: #6b7280;
+  font-size: 0.85rem;
 }
 
 .messages-container {

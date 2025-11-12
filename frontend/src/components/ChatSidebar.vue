@@ -14,31 +14,37 @@ interface ApiConversation {
     status?: string;
     lastSeen?: string;
   };
-  lastMessage: {
-    content: string;
-    senderId: string;
-    createdAt: string;
-    type: string;
+  lastMessage?: {
+    content?: string;
+    senderId?: string;
+    senderName?: string;
+    createdAt?: string;
+    type?: string;
   };
-  unreadCount: Record<string, number>;
-  lastMessageAt: string;
+  unreadCount?: Record<string, number> | number;
+  lastMessageAt?: string;
 }
 
 interface Props {
   messages: Message[];
   currentUser: string;
   currentUserId?: string;
-  activeRecipient: string;
+  activeConversationId?: string;
   isConnected: boolean;
   showProfileDropdown: boolean;
   apiConversations?: ApiConversation[];
 }
 
-interface Conversation {
-  username: string;
+interface ConversationPreview {
+  conversationId: string;
+  type: 'direct' | 'group';
+  name: string;
+  subtitle?: string;
   lastMessage: string;
   timestamp: Date;
   unreadCount: number;
+  chatInfo: ApiConversation['chatInfo'];
+  source: ApiConversation;
 }
 
 interface User {
@@ -50,11 +56,12 @@ interface User {
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  selectConversation: [username: string];
-  startNewChat: [user: User]; // New event for starting chat with search result
+  selectConversation: [conversation: ApiConversation];
+  startNewChat: [user: User];
   toggleProfile: [];
   logout: [];
   goToProfile: [];
+  createGroup: [];
 }>();
 
 const searchQuery = ref('');
@@ -62,49 +69,77 @@ const searchResults = ref<User[]>([]);
 const isSearching = ref(false);
 const showSearchResults = ref(false);
 
-// Get user initials for avatar
 const userInitials = computed(() => {
   return props.currentUser ? props.currentUser.charAt(0).toUpperCase() : '?';
 });
 
-// Group messages by conversation partners OR use API conversations
-const conversations = computed(() => {
-  // If we have API conversations, use them
+const displayConversations = computed<ConversationPreview[]>(() => {
   if (props.apiConversations && props.apiConversations.length > 0) {
-    return props.apiConversations.map(conv => ({
-      username: conv.chatInfo.username || conv.chatInfo.name || 'Unknown',
-      lastMessage: conv.lastMessage.content,
-      timestamp: new Date(conv.lastMessageAt),
-      unreadCount: props.currentUserId ? (conv.unreadCount[props.currentUserId] || 0) : 0,
-      avatar: conv.chatInfo.avatar,
-      status: conv.chatInfo.status,
-      type: conv.type,
-    }));
+    return [...props.apiConversations]
+      .sort((a, b) => {
+        const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+        const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+        return bTime - aTime;
+      })
+      .map((conv) => {
+        const name = conv.type === 'group'
+          ? conv.chatInfo.name || 'Nhóm chưa đặt tên'
+          : conv.chatInfo.username || 'Người dùng';
+        const lastMessage = conv.lastMessage?.content || 'Chưa có tin nhắn';
+        const lastTimestamp = conv.lastMessage?.createdAt || conv.lastMessageAt;
+        const unread = conv.unreadCount
+          ? typeof conv.unreadCount === 'number'
+            ? conv.unreadCount
+            : props.currentUserId
+              ? conv.unreadCount[props.currentUserId] || 0
+              : 0
+          : 0;
+
+        return {
+          conversationId: conv.conversationId,
+          type: conv.type,
+          name,
+          subtitle: conv.type === 'group' ? 'Nhóm' : conv.chatInfo.status,
+          lastMessage,
+          timestamp: lastTimestamp ? new Date(lastTimestamp) : new Date(0),
+          unreadCount: unread,
+          chatInfo: conv.chatInfo,
+          source: conv,
+        };
+      });
   }
 
-  // Fallback to deriving from messages (legacy behavior)
-  const conversationMap = new Map<string, Conversation>();
+  const conversationMap = new Map<string, ConversationPreview>();
 
   props.messages.forEach((msg) => {
-    // Determine the other person in the conversation
     const otherUser = msg.from === props.currentUser ? msg.to : msg.from;
-    
     const existing = conversationMap.get(otherUser);
     const msgTime = new Date(msg.timestamp);
 
-    if (!existing || new Date(existing.timestamp) < msgTime) {
+    if (!existing || existing.timestamp.getTime() < msgTime.getTime()) {
       conversationMap.set(otherUser, {
-        username: otherUser,
+        conversationId: otherUser,
+        type: 'direct',
+        name: otherUser,
         lastMessage: msg.content,
         timestamp: msgTime,
-        unreadCount: 0, // TODO: Implement unread count
-      });
+        unreadCount: 0,
+        chatInfo: { username: otherUser },
+        source: {
+          conversationId: otherUser,
+          type: 'direct',
+          chatInfo: { username: otherUser },
+          lastMessage: {
+            content: msg.content,
+            createdAt: msgTime.toISOString(),
+          },
+        },
+      } as ConversationPreview);
     }
   });
 
-  // Convert to array and sort by most recent
   return Array.from(conversationMap.values()).sort(
-    (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
   );
 });
 
@@ -115,20 +150,19 @@ const formatTime = (date: Date) => {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes}p`; 
+  if (hours < 24) return `${hours}g`;
+  if (days < 7) return `${days}n`;
   return date.toLocaleDateString();
 };
 
 const truncateMessage = (text: string, maxLength: number = 30) => {
-  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 };
 
-const selectConversation = (username: string) => {
-  emit('selectConversation', username);
-  // Clear search after selecting
+const selectConversation = (conversation: ConversationPreview) => {
+  emit('selectConversation', conversation.source);
   searchQuery.value = '';
   showSearchResults.value = false;
 };
@@ -145,28 +179,28 @@ const searchUsers = async () => {
 
   try {
     const token = localStorage.getItem('access_token');
-    
+
     if (!token || token === 'undefined' || token === 'null') {
       searchResults.value = [];
       isSearching.value = false;
       return;
     }
-    
+
     const response = await fetch(
       `http://localhost:3000/api/v1/users/search?q=${encodeURIComponent(searchQuery.value)}`,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (response.ok) {
       const users = await response.json();
-      // Handle wrapped response from ResponseTransformInterceptor
       const userList = users.data || users;
-      // Filter out current user from results
-      searchResults.value = userList.filter((u: User) => u.username !== props.currentUser);
+      searchResults.value = userList.filter(
+        (u: User) => u.username !== props.currentUser,
+      );
     } else {
       searchResults.value = [];
     }
@@ -179,7 +213,6 @@ const searchUsers = async () => {
 };
 
 const handleSearchInput = () => {
-  // Debounce search
   if (searchQuery.value.trim()) {
     searchUsers();
   } else {
@@ -195,9 +228,7 @@ const clearSearch = () => {
 };
 
 const startChatWithUser = (user: User) => {
-  // Emit with full user object so ChatView can create conversation
   emit('startNewChat', user);
-  // Clear search
   searchQuery.value = '';
   showSearchResults.value = false;
 };
@@ -205,19 +236,19 @@ const startChatWithUser = (user: User) => {
 
 <template>
   <div class="sidebar">
-    <!-- Combined Header Section -->
     <div class="sidebar-top">
       <div class="sidebar-header">
         <h3>💬 Chats</h3>
         <div class="header-actions">
-          <!-- Profile Avatar Button -->
+          <button class="create-group" @click="emit('createGroup')">
+            ➕ Nhóm
+          </button>
           <div class="profile-menu">
             <button @click="emit('toggleProfile')" class="profile-avatar" :title="currentUser">
               <span class="avatar-text">{{ userInitials }}</span>
               <span :class="['status-indicator', isConnected ? 'connected' : 'disconnected']"></span>
             </button>
-            
-            <!-- Profile Dropdown -->
+
             <div v-if="showProfileDropdown" class="dropdown-menu">
               <div class="dropdown-header">
                 <div class="dropdown-avatar">{{ userInitials }}</div>
@@ -225,30 +256,29 @@ const startChatWithUser = (user: User) => {
                   <div class="dropdown-username">{{ currentUser }}</div>
                   <div class="dropdown-status">
                     <span :class="['status-dot', isConnected ? 'connected' : 'disconnected']"></span>
-                    <span>{{ isConnected ? 'Connected' : 'Disconnected' }}</span>
+                    <span>{{ isConnected ? 'Đang online' : 'Ngoại tuyến' }}</span>
                   </div>
                 </div>
               </div>
-              
+
               <div class="dropdown-divider"></div>
-              
+
               <button @click="emit('goToProfile')" class="dropdown-item">
                 <span class="item-icon">👤</span>
-                <span>Profile Settings</span>
+                <span>Cài đặt tài khoản</span>
               </button>
-              
+
               <div class="dropdown-divider"></div>
-              
+
               <button @click="emit('logout')" class="dropdown-item logout">
                 <span class="item-icon">🚪</span>
-                <span>Logout</span>
+                <span>Đăng xuất</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Search Bar -->
       <div class="search-container">
         <div class="search-input-wrapper">
           <span class="search-icon">🔍</span>
@@ -256,26 +286,25 @@ const startChatWithUser = (user: User) => {
             v-model="searchQuery"
             @input="handleSearchInput"
             type="text"
-            placeholder="Search users..."
+            placeholder="Tìm kiếm người dùng..."
             class="search-input"
           />
           <button
             v-if="searchQuery"
             @click="clearSearch"
             class="clear-search-btn"
-            title="Clear search"
+            title="Xóa"
           >
             ✕
           </button>
         </div>
 
-        <!-- Search Results Dropdown -->
         <div v-if="showSearchResults" class="search-results">
           <div v-if="isSearching" class="search-loading">
-            <span>🔄 Searching...</span>
+            <span>Đang tìm...</span>
           </div>
           <div v-else-if="searchResults.length === 0" class="no-results">
-            <span>No users found</span>
+            <span>Không tìm thấy người dùng</span>
           </div>
           <div v-else class="results-list">
             <div
@@ -299,20 +328,19 @@ const startChatWithUser = (user: User) => {
       </div>
     </div>
 
-    <!-- Conversations List -->
     <div class="conversations-list">
       <div
-        v-for="conv in conversations"
-        :key="conv.username"
-        :class="['conversation-item', { active: conv.username === activeRecipient }]"
-        @click="selectConversation(conv.username)"
+        v-for="conv in displayConversations"
+        :key="conv.conversationId"
+        :class="['conversation-item', { active: conv.conversationId === activeConversationId }]"
+        @click="selectConversation(conv)"
       >
         <div class="conversation-avatar">
-          {{ conv.username.charAt(0).toUpperCase() }}
+          {{ conv.name.charAt(0).toUpperCase() }}
         </div>
         <div class="conversation-info">
           <div class="conversation-header">
-            <span class="conversation-name">{{ conv.username }}</span>
+            <span class="conversation-name">{{ conv.name }}</span>
             <span class="conversation-time">{{ formatTime(conv.timestamp) }}</span>
           </div>
           <div class="conversation-preview">
@@ -324,9 +352,9 @@ const startChatWithUser = (user: User) => {
         </div>
       </div>
 
-      <div v-if="conversations.length === 0" class="no-conversations">
-        <p>💬 No conversations yet</p>
-        <p class="hint">Start chatting to see conversations here</p>
+      <div v-if="displayConversations.length === 0" class="no-conversations">
+        <p>💬 Chưa có cuộc trò chuyện</p>
+        <p class="hint">Tạo nhóm hoặc tìm bạn bè để bắt đầu</p>
       </div>
     </div>
   </div>
@@ -342,7 +370,6 @@ const startChatWithUser = (user: User) => {
   height: 100%;
 }
 
-/* Combined Top Section */
 .sidebar-top {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -372,17 +399,21 @@ const startChatWithUser = (user: User) => {
   gap: 0.75rem;
 }
 
-.conversation-count {
+.create-group {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.25);
-  padding: 0.2rem 0.55rem;
-  border-radius: 10px;
-  font-size: 0.8rem;
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
   font-weight: 600;
-  backdrop-filter: blur(10px);
-  line-height: 1.2;
 }
 
-/* Profile Menu in Sidebar */
+.create-group:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
 .profile-menu {
   position: relative;
 }
@@ -407,15 +438,12 @@ const startChatWithUser = (user: User) => {
 .profile-avatar:hover {
   transform: scale(1.08);
   background: rgba(255, 255, 255, 0.4);
-  border-color: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .avatar-text {
   color: white;
   font-weight: 600;
   font-size: 0.95rem;
-  line-height: 1;
 }
 
 .status-indicator {
@@ -436,7 +464,6 @@ const startChatWithUser = (user: User) => {
   background: #ef4444;
 }
 
-/* Dropdown Menu */
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 0.5rem);
@@ -560,7 +587,6 @@ const startChatWithUser = (user: User) => {
   text-align: center;
 }
 
-/* Search Bar Styles */
 .search-container {
   position: relative;
   padding: 0 1.25rem 0.75rem 1.25rem;
@@ -626,7 +652,6 @@ const startChatWithUser = (user: User) => {
   transform: scale(1.05);
 }
 
-/* Search Results Dropdown */
 .search-results {
   position: absolute;
   top: 100%;
@@ -708,7 +733,6 @@ const startChatWithUser = (user: User) => {
   color: #6b7280;
 }
 
-/* Conversations List */
 .conversations-list {
   flex: 1;
   overflow-y: auto;

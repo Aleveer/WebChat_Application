@@ -9,6 +9,7 @@ import {
   ConversationSchema,
 } from './schemas/conversation.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { Group, GroupSchema } from '../groups/schemas/group.schema';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
       { name: User.name, schema: UserSchema },
+      { name: Group.name, schema: GroupSchema },
     ]),
   ],
   controllers: [ChatController],

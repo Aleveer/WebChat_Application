@@ -26,22 +26,22 @@ export class Group {
   @Prop({ type: [GroupMember], required: true, minlength: 1 })
   members: GroupMember[];
 
+  @Prop({ type: Types.ObjectId, ref: 'Conversation', required: false })
+  conversation_id?: Types.ObjectId;
+
   @Prop({ type: Date, default: Date.now })
   created_at: Date;
 
-  // Virtual field for active members count
   get active_members_count(): number {
     return this.members.filter((member) => member.removed_at === null).length;
   }
 
-  // Method to check if user is member
   isMember(userId: Types.ObjectId): boolean {
     return this.members.some(
       (member) => member.user_id.equals(userId) && member.removed_at === null,
     );
   }
 
-  // Method to check if user is admin
   isAdmin(userId: Types.ObjectId): boolean {
     return this.members.some(
       (member) =>
@@ -51,14 +51,12 @@ export class Group {
     );
   }
 
-  // Method to add member
   addMember(userId: Types.ObjectId, isAdmin: boolean = false): void {
     const existingMember = this.members.find((member) =>
       member.user_id.equals(userId),
     );
 
     if (existingMember) {
-      // If user was removed before, reactivate them
       if (existingMember.removed_at) {
         existingMember.removed_at = null;
         existingMember.joined_at = new Date();
@@ -74,7 +72,6 @@ export class Group {
     }
   }
 
-  // Method to remove member
   removeMember(userId: Types.ObjectId): boolean {
     const member = this.members.find((member) => member.user_id.equals(userId));
     if (member && member.removed_at === null) {
@@ -84,7 +81,18 @@ export class Group {
     return false;
   }
 
-  // Method to promote/demote admin
+  activeAdminCount(): number {
+    return this.members.filter(
+      (member) => member.removed_at === null && member.is_admin,
+    ).length;
+  }
+
+  getActiveMembers(): Types.ObjectId[] {
+    return this.members
+      .filter((member) => member.removed_at === null)
+      .map((member) => member.user_id);
+  }
+
   setAdmin(userId: Types.ObjectId, isAdmin: boolean): boolean {
     const member = this.members.find(
       (member) => member.user_id.equals(userId) && member.removed_at === null,
@@ -99,29 +107,19 @@ export class Group {
 
 export const GroupSchema = SchemaFactory.createForClass(Group);
 
-// Add virtual field to schema
 GroupSchema.virtual('active_members_count').get(function () {
   return this.members.filter((member) => member.removed_at === null).length;
 });
 
-// Ensure virtual fields are serialized
 GroupSchema.set('toJSON', {
   virtuals: true,
 });
 
-// PERFORMANCE: Comprehensive indexing strategy
-// 1. Index for finding groups by user membership
 GroupSchema.index({ 'members.user_id': 1, 'members.removed_at': 1 });
-
-// 2. Index for group creation time
 GroupSchema.index({ created_at: -1 });
-
-// 3. Compound index for active member queries
 GroupSchema.index({
   'members.user_id': 1,
   'members.is_admin': 1,
   'members.removed_at': 1,
 });
-
-// 4. Text index for group name search
 GroupSchema.index({ name: 'text' });

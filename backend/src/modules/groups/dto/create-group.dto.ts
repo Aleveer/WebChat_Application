@@ -7,7 +7,8 @@ import {
   IsBoolean,
   IsMongoId,
   MaxLength,
-  MinLength,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -30,7 +31,8 @@ export class CreateGroupDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => GroupMemberDto)
-  @MinLength(3, { message: 'Group must have at least three members' })
+  @ArrayMinSize(3, { message: 'Group must have at least three members' })
+  @ArrayMaxSize(100, { message: 'Group can have at most one hundred members' })
   members: GroupMemberDto[];
 }
 

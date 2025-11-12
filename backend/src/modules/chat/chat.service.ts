@@ -1,273 +1,373 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-//import { Redis } from 'ioredis';
 import { Message } from '../messages/schemas/message.schema';
 import { Conversation } from './schemas/conversation.schema';
 import { User } from '../users/schemas/user.schema';
+import { Group, GroupDocument } from '../groups/schemas/group.schema';
+
+type PersistMessageResult = {
+  message: Message;
+  conversationId: Types.ObjectId;
+};
+
+type PersistMessagePayload = {
+  conversation: Conversation;
+  senderId: Types.ObjectId;
+  receiver:
+    | { type: 'user'; id: Types.ObjectId }
+    | {
+        type: 'group';
+        id: Types.ObjectId;
+        name: string;
+        participants: Types.ObjectId[];
+      };
+  content: string;
+  messageType: string;
+};
 
 @Injectable()
 export class ChatService {
-    //private redis: Redis;
+  constructor(
+    @InjectModel(Message.name) private readonly messageModel: Model<Message>,
+    @InjectModel(Conversation.name)
+    private readonly conversationModel: Model<Conversation>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Group.name) private readonly groupModel: Model<GroupDocument>,
+    @Inject(forwardRef(() => require('./chat.gateway').ChatGateway))
+    private readonly chatGateway: any,
+  ) {}
 
-    constructor(
-        @InjectModel(Message.name) private messageModel: Model<Message>,
-        @InjectModel(Conversation.name) private conversationModel: Model<Conversation>,
-        @InjectModel(User.name) private userModel: Model<User>,
-        @Inject(forwardRef(() => require('./chat.gateway').ChatGateway))
-        private chatGateway: any, // Use any to avoid circular type dependency
-    ) { }
-    // ) {
-    //     this.redis = new Redis({
-    //         host: process.env.REDIS_HOST || 'localhost',
-    //         port: parseInt(process.env.REDIS_PORT) || 6379,
-    //     });
-    // }
-
-    // ==================== GET RECENT CHATS ====================
-    async getRecentChats(userId: string, limit: number) {
-        // validate userId to avoid throwing low-level errors when an invalid id is passed
-        if (!Types.ObjectId.isValid(userId)) {
-            throw new BadRequestException('Invalid userId');
-        }
-        //const cacheKey = `chat_list:${userId}`;
-
-        // 1️⃣ CHECK REDIS CACHE
-        // const cached = await this.redis.get(cacheKey);
-        // if (cached) {
-        //     console.log(`✅ Cache HIT for user ${userId}`);
-        //     return JSON.parse(cached);
-        // }
-
-        //console.log(`⏳ Cache MISS for user ${userId} - querying MongoDB...`);
-
-        // 2️⃣ QUERY MONGODB
-        const userObjectId = new Types.ObjectId(userId);
-        const conversations = await this.conversationModel
-            .find({
-                participants: userObjectId,
-                isDeleted: false,
-                lastMessage: { $exists: true }, // Chỉ lấy conversation có tin nhắn
-            })
-            .populate('participants', 'username')
-            //.populate('groupId', 'name avatar')
-            .sort({ lastMessageAt: -1 })
-            .limit(limit)
-            .lean();
-
-        // 3️⃣ FORMAT DATA
-        const formattedChats = conversations.map((conv: any) => {
-            const isGroup = conv.type === 'group';
-
-            // Nếu direct chat, lấy thông tin người chat
-            const otherUser = isGroup
-                ? null
-                : conv.participants.find((p: any) => p._id.toString() !== userId);
-
-            return {
-                conversationId: conv._id,
-                type: conv.type,
-
-                // Info của người/nhóm chat
-                chatInfo: isGroup ? {
-                    groupId: conv.groupId._id,
-                    name: conv.groupId.name,
-                    avatar: conv.groupId.avatar,
-                } : {
-                    userId: otherUser._id,
-                    username: otherUser.username,
-                    avatar: otherUser.avatar,
-                    status: otherUser.status,
-                    lastSeen: otherUser.lastSeen,
-                },
-
-                // Last message
-                lastMessage: {
-                    content: conv.lastMessage.content,
-                    senderId: conv.lastMessage.senderId,
-                    senderName: conv.lastMessage.senderName,
-                    type: conv.lastMessage.type,
-                },
-
-                // Unread count
-                unreadCount: conv.unreadCount || 0,
-
-                lastMessageAt: conv.lastMessageAt,
-            };
-        });
-
-        // 4️⃣ CACHE VÀO REDIS (TTL: 5 phút)
-        // await this.redis.setex(cacheKey, 300, JSON.stringify(formattedChats));
-        // console.log(`💾 Cached chat list for user ${userId}`);
-
-        return formattedChats;
+  async getRecentChats(userId: string, limit: number) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
     }
 
-    // ==================== SEND MESSAGE ====================
-    async sendMessage(senderId: string, receiverId: string, content: string, type: string = 'text') {
-        const senderObjectId = new Types.ObjectId(senderId);
-        const receiverObjectId = new Types.ObjectId(receiverId);
+    const userObjectId = new Types.ObjectId(userId);
+    const conversations = await this.conversationModel
+      .find({
+        participants: userObjectId,
+        isDeleted: false,
+      })
+      .populate('participants', 'username avatar status lastSeen')
+      .populate('groupId', 'name')
+      .sort({ lastMessageAt: -1 })
+      .limit(limit)
+      .lean();
 
-        // 1️⃣ TÌM HOẶC TẠO CONVERSATION
-        let conversation = await this.conversationModel.findOne({
-            type: 'direct',
-            participants: { $all: [senderObjectId, receiverObjectId] },
-        });
+    return conversations.map((conv: any) => {
+      const isGroup = conv.type === 'group';
+      const lastMessage = conv.lastMessage || {};
+      const unreadCountMap =
+        conv.unreadCount instanceof Map
+          ? Object.fromEntries(conv.unreadCount)
+          : conv.unreadCount || {};
 
-        if (!conversation) {
-            conversation = await this.conversationModel.create({
-                type: 'direct',
-                participants: [senderObjectId, receiverObjectId],
-                unreadCount: new Map(),
-            });
-            console.log(`🆕 Created new conversation: ${conversation._id}`);
-        }
-
-        // 2️⃣ LƯU MESSAGE VÀO DB
-        const message = await this.messageModel.create({
-            conversationId: conversation._id,  // Add conversationId
-            senderId: senderObjectId,
-            receiver_type: "user",
-            receiverId: receiverObjectId,
-            text: content
-        });
-
-        // 3️⃣ POPULATE SENDER INFO
-        await message.populate('senderId', 'username avatar');
-
-        // 4️⃣ UPDATE CONVERSATION
-        //const sender = await this.userModel.findById(senderId).select('username');
-
-        await this.conversationModel.findByIdAndUpdate(conversation._id, {
-            lastMessage: {
-                content: message.text,
-                senderId: message.senderId,
-                type,
-            },
-            lastMessageAt: message.createdAt,
-            $inc: { [`unreadCount.${receiverId}`]: 1 }, // Tăng unread cho receiver
-        });
-
-        // 5️⃣ INVALIDATE CACHE của cả 2 users
-        // await this.invalidateChatListCache(senderId);
-        // await this.invalidateChatListCache(receiverId);
-
-        // console.log(`💬 Message sent | Sender: ${senderId} | Receiver: ${receiverId}`);
-        // console.log(`🗑️  Invalidated cache for both users`);
-
-        // 6️⃣ EMIT TO CONVERSATION ROOM via WebSocket
-        if (this.chatGateway && this.chatGateway.emitMessageToConversation) {
-            // Get sender username from populated senderId
-            const senderUsername = typeof message.senderId === 'object' && message.senderId 
-                ? (message.senderId as any).username 
-                : message.senderId;
-            
-            // Get receiver username - need to fetch it
-            const receiverUser = await this.userModel.findById(receiverId).select('username');
-            const receiverUsername = receiverUser?.username || receiverId;
-      
-            const messageForClient = {
-                id: message._id.toString(),
-                from: senderUsername,
-                to: receiverUsername,
-                content: message.text,
-                timestamp: message.createdAt,
-                conversationId: (conversation._id as Types.ObjectId).toString(),
-            };
-            
-            console.log('📤 Emitting message to clients:', messageForClient);
-            
-            // Emit to conversation room (for users who have joined the conv)
-            this.chatGateway.emitMessageToConversation((conversation._id as Types.ObjectId).toString(), messageForClient);
-            
-            // ALSO emit to receiver's user room (fallback for users not in conv room yet)
-            if (this.chatGateway.emitMessageToUser) {
-                console.log('📤 Emitting to user room for receiverId:', receiverId);
-                this.chatGateway.emitMessageToUser(receiverId, messageForClient);
-            }
-        }
-
-        return {
-            message,
-            conversationId: conversation._id,
+      let chatInfo: Record<string, any>;
+      if (isGroup) {
+        chatInfo = {
+          groupId: conv.groupId?._id?.toString() ?? conv.groupId?.toString?.(),
+          name: conv.groupId?.name ?? 'Nhóm chưa đặt tên',
         };
-    }
-
-    // ==================== SEND MESSAGE BY CONVERSATION ID ====================
-    // find receiverId
-    async sendMessageByConversation(
-        senderId: string,
-        conversationId: string,
-        content: string,
-        type: string = 'text'
-    ) {
-        // validate conversationId early
-        if (!Types.ObjectId.isValid(conversationId)) {
-            throw new BadRequestException('Invalid conversationId');
-        }
-
-        const conversation = await this.conversationModel.findById(new Types.ObjectId(conversationId));
-        
-        if (!conversation) {
-            console.error('Conversation not found with ID:', conversationId);
-            throw new Error('Conversation not found');
-        }
-
-        console.log("Conversation found:", conversation);
-
-        // Find the receiver (the other participant)
-        const receiverId = conversation.participants.find(
-            (p) => p.toString() !== senderId
+      } else {
+        const otherUser = (conv.participants || []).find(
+          (participant: any) =>
+            participant?._id?.toString() &&
+            participant._id.toString() !== userId,
         );
+        chatInfo = otherUser
+          ? {
+              userId: otherUser._id?.toString(),
+              username: otherUser.username,
+              avatar: otherUser.avatar,
+              status: otherUser.status,
+              lastSeen: otherUser.lastSeen,
+            }
+          : {
+              userId: undefined,
+              username: 'Người dùng',
+            };
+      }
 
-        if (!receiverId) {
-            throw new Error('Receiver not found in conversation');
-        }
+      return {
+        conversationId: conv._id?.toString(),
+        type: conv.type,
+        chatInfo,
+        lastMessage: {
+          content: lastMessage.content ?? '',
+          senderId:
+            typeof lastMessage.senderId === 'object'
+              ? lastMessage.senderId?.toString()
+              : (lastMessage.senderId ?? null),
+          senderName: lastMessage.senderName ?? null,
+          type: lastMessage.type ?? 'text',
+          createdAt: lastMessage.createdAt ?? conv.lastMessageAt ?? null,
+        },
+        unreadCount: unreadCountMap,
+        lastMessageAt: conv.lastMessageAt,
+      };
+    });
+  }
 
-        console.log("Receiver ID:", receiverId.toString());
+  async sendMessage(
+    senderId: string,
+    receiverId: string,
+    content: string,
+    type: string = 'text',
+  ): Promise<PersistMessageResult> {
+    const senderObjectId = new Types.ObjectId(senderId);
+    const receiverObjectId = new Types.ObjectId(receiverId);
 
-        // Reuse the existing sendMessage logic
-        return this.sendMessage(senderId, receiverId.toString(), content, type);
+    let conversation = await this.conversationModel.findOne({
+      type: 'direct',
+      participants: { $all: [senderObjectId, receiverObjectId] },
+    });
+
+    if (!conversation) {
+      conversation = await this.conversationModel.create({
+        type: 'direct',
+        participants: [senderObjectId, receiverObjectId],
+        unreadCount: new Map(),
+      });
     }
 
-    // ==================== GET MESSAGES (CURSOR-BASED PAGINATION) ====================
-    async getMessages(
-        conversationId: string, 
-        limit: number,
-        beforeMessageId?: string  // Cursor: Get messages before this message ID
+    const conversationDoc = conversation as unknown as Conversation;
+
+    return this.persistMessage({
+      conversation: conversationDoc,
+      senderId: senderObjectId,
+      receiver: {
+        type: 'user',
+        id: receiverObjectId,
+      },
+      content,
+      messageType: type,
+    });
+  }
+
+  async sendMessageByConversation(
+    senderId: string,
+    conversationId: string,
+    content: string,
+    type: string = 'text',
+  ): Promise<PersistMessageResult> {
+    if (!Types.ObjectId.isValid(conversationId)) {
+      throw new BadRequestException('Invalid conversationId');
+    }
+
+    const conversation = await this.conversationModel.findById(
+      new Types.ObjectId(conversationId),
+    );
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const senderObjectId = new Types.ObjectId(senderId);
+    if (
+      !conversation.participants.some((participant) =>
+        participant.equals(senderObjectId),
+      )
     ) {
-        // validate conversationId
-        if (!Types.ObjectId.isValid(conversationId)) {
-            throw new BadRequestException('Invalid conversationId');
-        }
-
-        const query: any = {
-            conversationId: new Types.ObjectId(conversationId),
-            //isDeleted: false
-        };
-
-        // If cursor is provided, get messages before that message
-        if (beforeMessageId) {
-            if (!Types.ObjectId.isValid(beforeMessageId)) {
-                throw new BadRequestException('Invalid beforeMessageId');
-            }
-
-            const cursorMessage = await this.messageModel.findById(new Types.ObjectId(beforeMessageId));
-            if (cursorMessage) {
-                query.createdAt = { $lt: cursorMessage.createdAt };
-            }
-        }
-
-        const messages = await this.messageModel
-            .find(query)
-            .sort({ createdAt: -1 }) // Latest first
-            .limit(limit)
-            .lean();
-
-        return {
-            messages: messages.reverse(), // Reverse to show old → new
-            hasMore: messages.length === limit, // If we got full limit, there might be more
-            oldestMessageId: messages.length > 0 ? messages[0]._id : null // Cursor for next request
-        };
+      throw new ForbiddenException('Sender is not part of this conversation');
     }
+
+    const conversationDoc = conversation as unknown as Conversation;
+
+    if (conversation.type === 'group') {
+      if (!conversation.groupId) {
+        throw new BadRequestException('Group conversation is missing groupId');
+      }
+
+      const group = await this.groupModel.findById(conversation.groupId);
+      if (!group) {
+        throw new NotFoundException('Group not found');
+      }
+
+      const groupDoc = group as any as GroupDocument;
+      const senderMember = groupDoc.members.find(
+        (member) =>
+          member.user_id.toString() === senderObjectId.toString() &&
+          (member.removed_at === null || member.removed_at === undefined),
+      );
+
+      if (!senderMember) {
+        throw new ForbiddenException('Sender is not a member of this group');
+      }
+
+      const groupReceiver = {
+        type: 'group' as const,
+        id: groupDoc._id as Types.ObjectId,
+        name: groupDoc.name ?? 'Group',
+        participants: groupDoc.members
+          .filter((member) => member.removed_at === null)
+          .map((member) => member.user_id as Types.ObjectId),
+      };
+
+      return this.persistMessage({
+        conversation: conversationDoc,
+        senderId: senderObjectId,
+        receiver: groupReceiver,
+        content,
+        messageType: type,
+      });
+    }
+
+    const receiverId = conversation.participants.find(
+      (participant) => !participant.equals(senderObjectId),
+    );
+    if (!receiverId) {
+      throw new BadRequestException('Receiver not found in conversation');
+    }
+
+    return this.persistMessage({
+      conversation: conversationDoc,
+      senderId: senderObjectId,
+      receiver: {
+        type: 'user',
+        id: receiverId as Types.ObjectId,
+      },
+      content,
+      messageType: type,
+    });
+  }
+
+  async getMessages(
+    conversationId: string,
+    limit: number,
+    beforeMessageId?: string,
+  ) {
+    if (!Types.ObjectId.isValid(conversationId)) {
+      throw new BadRequestException('Invalid conversationId');
+    }
+
+    const query: Record<string, unknown> = {
+      conversationId: new Types.ObjectId(conversationId),
+    };
+
+    if (beforeMessageId) {
+      if (!Types.ObjectId.isValid(beforeMessageId)) {
+        throw new BadRequestException('Invalid beforeMessageId');
+      }
+
+      const cursorMessage = await this.messageModel.findById(
+        new Types.ObjectId(beforeMessageId),
+      );
+      if (cursorMessage) {
+        query.createdAt = { $lt: cursorMessage.createdAt };
+      }
+    }
+
+    const messages = await this.messageModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return {
+      messages: messages.reverse(),
+      hasMore: messages.length === limit,
+      oldestMessageId: messages.length > 0 ? messages[0]._id : null,
+    };
+  }
+
+  private async persistMessage({
+    conversation,
+    senderId,
+    receiver,
+    content,
+    messageType,
+  }: PersistMessagePayload): Promise<PersistMessageResult> {
+    const message = await this.messageModel.create({
+      conversationId: conversation._id,
+      senderId,
+      receiver_type: receiver.type,
+      receiverId: receiver.id,
+      text: content,
+    });
+
+    await message.populate('senderId', 'username avatar');
+    const senderUsername =
+      typeof message.senderId === 'object' && message.senderId
+        ? (message.senderId as any).username
+        : senderId.toString();
+
+    const incOps: Record<string, number> = {};
+    const participantIds =
+      receiver.type === 'group'
+        ? receiver.participants
+        : conversation.participants;
+
+    participantIds.forEach((participantId: Types.ObjectId) => {
+      const participantIdStr = participantId.toString();
+      if (participantIdStr !== senderId.toString()) {
+        incOps[`unreadCount.${participantIdStr}`] = 1;
+      }
+    });
+
+    const updatePayload: Record<string, unknown> = {
+      lastMessage: {
+        content,
+        senderId,
+        senderName: senderUsername,
+        type: messageType,
+        createdAt: message.createdAt,
+      },
+      lastMessageAt: message.createdAt,
+    };
+
+    if (Object.keys(incOps).length > 0) {
+      updatePayload.$inc = incOps;
+    }
+
+    await this.conversationModel.findByIdAndUpdate(conversation._id, {
+      ...updatePayload,
+    });
+
+    const messageForClient = {
+      id: message._id.toString(),
+      from: senderUsername,
+      to:
+        receiver.type === 'group'
+          ? receiver.name
+          : await this.resolveUserName(receiver.id),
+      content,
+      timestamp: message.createdAt,
+      conversationId: conversation._id.toString(),
+      type: messageType,
+    };
+
+    if (this.chatGateway?.emitMessageToConversation) {
+      this.chatGateway.emitMessageToConversation(
+        conversation._id.toString(),
+        messageForClient,
+      );
+    }
+
+    if (receiver.type === 'user' && this.chatGateway?.emitMessageToUser) {
+      this.chatGateway.emitMessageToUser(
+        receiver.id.toString(),
+        messageForClient,
+      );
+    }
+
+    return {
+      message,
+      conversationId: conversation._id as Types.ObjectId,
+    };
+  }
+
+  private async resolveUserName(userId: Types.ObjectId) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('username')
+      .lean();
+    return user?.username ?? userId.toString();
+  }
 }
