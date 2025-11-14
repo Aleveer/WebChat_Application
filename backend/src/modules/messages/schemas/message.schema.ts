@@ -27,6 +27,27 @@ export class Message {
   @Prop({ required: true })
   text: string;
 
+  @Prop({ default: 'text' })
+  messageType: string;
+
+  @Prop()
+  attachmentUrl?: string;
+
+  @Prop()
+  attachmentType?: string;
+
+  @Prop({ type: Object })
+  metadata?: Record<string, unknown>;
+
+  @Prop({ default: false })
+  isDeleted: boolean;
+
+  @Prop({ default: false })
+  isEdited: boolean;
+
+  @Prop({ type: Date })
+  editedAt: Date;
+
   @Prop({ default: Date.now })
   createdAt: Date;
 }

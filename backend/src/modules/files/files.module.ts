@@ -14,28 +14,31 @@ import { UsersModule } from '../users/users.module';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         limits: {
-          fileSize: configService.get<number>('file.maxSize', 10 * 1024 * 1024), // 10MB default
+          fileSize: configService.get<number>('file.maxSize', 50 * 1024 * 1024), // 50MB default
         },
         fileFilter: (req, file, callback) => {
-          const allowedMimes = configService.get<string[]>(
-            'file.allowedMimes',
-            [
-              'image/jpeg',
-              'image/png',
-              'image/gif',
-              'image/webp',
-              'application/pdf',
-              'text/plain',
-              'application/msword',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            ],
-          );
+          const allowedMimes =
+            configService.get<string[]>('file.allowedMimes') || [];
+          const allowAll =
+            allowedMimes.length === 0 || allowedMimes.includes('*/*');
 
-          if (allowedMimes.includes(file.mimetype)) {
-            callback(null, true);
-          } else {
-            callback(new Error('File type not allowed'), false);
+          if (allowAll) {
+            return callback(null, true);
           }
+
+          const isAllowed = allowedMimes.some((mime) => {
+            if (mime.endsWith('/*')) {
+              const prefix = mime.slice(0, -1);
+              return file.mimetype.startsWith(prefix);
+            }
+            return mime === file.mimetype;
+          });
+
+          if (isAllowed) {
+            return callback(null, true);
+          }
+
+          return callback(new Error('File type not allowed'), false);
         },
       }),
       inject: [ConfigService],

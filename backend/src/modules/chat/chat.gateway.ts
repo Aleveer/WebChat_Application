@@ -39,6 +39,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`📨 Emitted message to room ${roomName}:`, message.id || message._id);
   }
 
+  // Method to emit message update (edit/delete) to conversation room
+  emitMessageUpdate(conversationId: string, update: any) {
+    const roomName = `conv:${conversationId}`;
+    this.server.to(roomName).emit('messageUpdate', update);
+    console.log(`🔄 Emitted message update to room ${roomName}:`, update.id);
+  }
+
   // Authenticate socket on connection using token provided in handshake.auth.token
   async handleConnection(client: Socket) {
     try {

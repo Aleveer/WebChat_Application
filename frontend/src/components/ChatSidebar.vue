@@ -20,6 +20,11 @@ interface ApiConversation {
     senderName?: string;
     createdAt?: string;
     type?: string;
+    attachmentUrl?: string | null;
+    attachmentType?: string | null;
+    metadata?: Record<string, any> | null;
+    isDeleted?: boolean;
+    isEdited?: boolean;
   };
   unreadCount?: Record<string, number> | number;
   lastMessageAt?: string;
@@ -62,6 +67,7 @@ const emit = defineEmits<{
   logout: [];
   goToProfile: [];
   createGroup: [];
+  closeConversation: [conversationId: string];
 }>();
 
 const searchQuery = ref('');
@@ -161,10 +167,34 @@ const truncateMessage = (text: string, maxLength: number = 30) => {
   return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 };
 
+const getLastMessagePreview = (conv: ConversationPreview) => {
+  const lastMessage = conv.source?.lastMessage;
+  if (!lastMessage) {
+    return conv.lastMessage || 'Chưa có tin nhắn';
+  }
+  if (lastMessage.isDeleted) {
+    return 'This message has been deleted';
+  }
+  if (lastMessage.attachmentType === 'image') {
+    return '🖼️ Đã gửi một hình ảnh';
+  }
+  if (lastMessage.attachmentType === 'audio') {
+    return '🎙️ Tin nhắn thoại';
+  }
+  if (lastMessage.attachmentType === 'file') {
+    return `📎 ${lastMessage.content || 'Tệp đính kèm'}`;
+  }
+  return lastMessage.content || 'Tin nhắn trống';
+};
+
 const selectConversation = (conversation: ConversationPreview) => {
   emit('selectConversation', conversation.source);
   searchQuery.value = '';
   showSearchResults.value = false;
+};
+
+const closeConversation = (conversationId: string) => {
+  emit('closeConversation', conversationId);
 };
 
 const searchUsers = async () => {
@@ -333,18 +363,26 @@ const startChatWithUser = (user: User) => {
         v-for="conv in displayConversations"
         :key="conv.conversationId"
         :class="['conversation-item', { active: conv.conversationId === activeConversationId }]"
-        @click="selectConversation(conv)"
       >
+        <button
+          v-if="conv.conversationId === activeConversationId"
+          class="conversation-close-btn"
+          type="button"
+          @click.stop="closeConversation(conv.conversationId)"
+          title="Đóng cuộc trò chuyện"
+        >
+          ×
+        </button>
         <div class="conversation-avatar">
           {{ conv.name.charAt(0).toUpperCase() }}
         </div>
-        <div class="conversation-info">
+        <div class="conversation-info" @click="selectConversation(conv)">
           <div class="conversation-header">
             <span class="conversation-name">{{ conv.name }}</span>
             <span class="conversation-time">{{ formatTime(conv.timestamp) }}</span>
           </div>
           <div class="conversation-preview">
-            {{ truncateMessage(conv.lastMessage) }}
+            {{ truncateMessage(getLastMessagePreview(conv)) }}
           </div>
         </div>
         <div v-if="conv.unreadCount > 0" class="unread-badge">
@@ -757,6 +795,24 @@ const startChatWithUser = (user: User) => {
 .conversation-item.active {
   background: #ede9fe;
   border-left: 3px solid #667eea;
+}
+
+.conversation-close-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-close-btn:hover {
+  color: #dc2626;
 }
 
 .conversation-avatar {

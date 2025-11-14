@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { ChatService } from './chat.service';
-import  { SendMessageByConversationDto } from './dto/send-message-by-conversation.dto';
+import { SendMessageByConversationDto } from './dto/send-message-by-conversation.dto';
+import { SendMessageDto } from './dto/send-message.dto';
 
 @Controller('chat')
 export class ChatController {
@@ -33,18 +34,53 @@ export class ChatController {
             dto.senderId,
             dto.conversationId,
             dto.content,
-            dto.type
+            dto.type,
+            {
+                attachmentUrl: dto.attachmentUrl,
+                attachmentType: dto.attachmentType,
+                metadata: dto.metadata,
+            }
         );
     }
 
     // POST /chat/message-new - Send a message to create new conversation with receiverId
     @Post('message-new')
-    async sendMessageNew(@Body() dto: { senderId: string; receiverId: string; content: string; type?: string }) {
+    async sendMessageNew(@Body() dto: SendMessageDto) {
         return this.chatService.sendMessage(
             dto.senderId,
             dto.receiverId,
             dto.content,
-            dto.type || 'text'
+            dto.type || 'text',
+            {
+                attachmentUrl: dto.attachmentUrl,
+                attachmentType: dto.attachmentType,
+                metadata: dto.metadata,
+            }
+        );
+    }
+
+    // PATCH /chat/message/:messageId - Edit a message
+    @Post('message/:messageId/edit')
+    async editMessage(
+        @Param('messageId') messageId: string,
+        @Body() dto: { senderId: string; content: string }
+    ) {
+        return this.chatService.editMessage(
+            messageId,
+            dto.senderId,
+            dto.content
+        );
+    }
+
+    // DELETE /chat/message/:messageId - Delete a message
+    @Post('message/:messageId/delete')
+    async deleteMessage(
+        @Param('messageId') messageId: string,
+        @Body() dto: { senderId: string }
+    ) {
+        return this.chatService.deleteMessage(
+            messageId,
+            dto.senderId
         );
     }
 }

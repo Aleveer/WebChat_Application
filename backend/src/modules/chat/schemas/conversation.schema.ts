@@ -19,6 +19,11 @@ export class Conversation extends Document {
     senderId: Types.ObjectId;
     senderName?: string;
     type: string;
+    attachmentUrl?: string;
+    attachmentType?: string;
+    metadata?: Record<string, unknown>;
+    isDeleted?: boolean;
+    isEdited?: boolean;
     createdAt?: Date;
   };
 

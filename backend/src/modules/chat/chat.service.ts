@@ -18,6 +18,12 @@ type PersistMessageResult = {
   conversationId: Types.ObjectId;
 };
 
+type MessageAttachmentOptions = {
+  attachmentUrl?: string;
+  attachmentType?: string;
+  metadata?: Record<string, any>;
+};
+
 type PersistMessagePayload = {
   conversation: Conversation;
   senderId: Types.ObjectId;
@@ -31,6 +37,7 @@ type PersistMessagePayload = {
       };
   content: string;
   messageType: string;
+  attachment?: MessageAttachmentOptions;
 };
 
 @Injectable()
@@ -109,6 +116,11 @@ export class ChatService {
           senderName: lastMessage.senderName ?? null,
           type: lastMessage.type ?? 'text',
           createdAt: lastMessage.createdAt ?? conv.lastMessageAt ?? null,
+          attachmentUrl: lastMessage.attachmentUrl ?? null,
+          attachmentType: lastMessage.attachmentType ?? null,
+          metadata: lastMessage.metadata ?? null,
+          isDeleted: lastMessage.isDeleted ?? false,
+          isEdited: lastMessage.isEdited ?? false,
         },
         unreadCount: unreadCountMap,
         lastMessageAt: conv.lastMessageAt,
@@ -119,8 +131,9 @@ export class ChatService {
   async sendMessage(
     senderId: string,
     receiverId: string,
-    content: string,
+    content: string = '',
     type: string = 'text',
+    attachmentOptions: MessageAttachmentOptions = {},
   ): Promise<PersistMessageResult> {
     const senderObjectId = new Types.ObjectId(senderId);
     const receiverObjectId = new Types.ObjectId(receiverId);
@@ -147,16 +160,18 @@ export class ChatService {
         type: 'user',
         id: receiverObjectId,
       },
-      content,
+      content: content ?? '',
       messageType: type,
+      attachment: attachmentOptions,
     });
   }
 
   async sendMessageByConversation(
     senderId: string,
     conversationId: string,
-    content: string,
+    content: string = '',
     type: string = 'text',
+    attachmentOptions: MessageAttachmentOptions = {},
   ): Promise<PersistMessageResult> {
     if (!Types.ObjectId.isValid(conversationId)) {
       throw new BadRequestException('Invalid conversationId');
@@ -214,8 +229,9 @@ export class ChatService {
         conversation: conversationDoc,
         senderId: senderObjectId,
         receiver: groupReceiver,
-        content,
+        content: content ?? '',
         messageType: type,
+        attachment: attachmentOptions,
       });
     }
 
@@ -233,8 +249,9 @@ export class ChatService {
         type: 'user',
         id: receiverId as Types.ObjectId,
       },
-      content,
+      content: content ?? '',
       messageType: type,
+      attachment: attachmentOptions,
     });
   }
 
@@ -266,6 +283,7 @@ export class ChatService {
 
     const messages = await this.messageModel
       .find(query)
+      .populate('senderId', 'username avatar')
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
@@ -283,6 +301,7 @@ export class ChatService {
     receiver,
     content,
     messageType,
+    attachment,
   }: PersistMessagePayload): Promise<PersistMessageResult> {
     const message = await this.messageModel.create({
       conversationId: conversation._id,
@@ -290,6 +309,10 @@ export class ChatService {
       receiver_type: receiver.type,
       receiverId: receiver.id,
       text: content,
+      messageType,
+      attachmentUrl: attachment?.attachmentUrl,
+      attachmentType: attachment?.attachmentType,
+      metadata: attachment?.metadata,
     });
 
     await message.populate('senderId', 'username avatar');
@@ -317,6 +340,11 @@ export class ChatService {
         senderId,
         senderName: senderUsername,
         type: messageType,
+        attachmentUrl: attachment?.attachmentUrl,
+        attachmentType: attachment?.attachmentType,
+        metadata: attachment?.metadata,
+        isDeleted: false,
+        isEdited: false,
         createdAt: message.createdAt,
       },
       lastMessageAt: message.createdAt,
@@ -332,6 +360,8 @@ export class ChatService {
 
     const messageForClient = {
       id: message._id.toString(),
+      messageType,
+      senderId: senderId.toString(),
       from: senderUsername,
       to:
         receiver.type === 'group'
@@ -340,7 +370,13 @@ export class ChatService {
       content,
       timestamp: message.createdAt,
       conversationId: conversation._id.toString(),
+      attachmentUrl: attachment?.attachmentUrl,
+      attachmentType: attachment?.attachmentType,
+      metadata: attachment?.metadata,
+      conversationType: conversation.type,
       type: messageType,
+      isDeleted: false,
+      isEdited: false,
     };
 
     if (this.chatGateway?.emitMessageToConversation) {
@@ -369,5 +405,129 @@ export class ChatService {
       .select('username')
       .lean();
     return user?.username ?? userId.toString();
+  }
+
+  async editMessage(
+    messageId: string,
+    senderId: string,
+    newContent: string,
+  ): Promise<Message> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException('Invalid messageId');
+    }
+
+    const message = await this.messageModel.findById(
+      new Types.ObjectId(messageId),
+    );
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const senderObjectId = new Types.ObjectId(senderId);
+    if (!message.senderId.equals(senderObjectId)) {
+      throw new ForbiddenException('You can only edit your own messages');
+    }
+
+    if (message.isDeleted) {
+      throw new BadRequestException('Cannot edit a deleted message');
+    }
+
+    message.text = newContent;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+    await this.updateConversationLastMessageSnapshot(message);
+
+    // Emit update to conversation
+    if (this.chatGateway?.emitMessageUpdate) {
+      this.chatGateway.emitMessageUpdate(message.conversationId.toString(), {
+        id: message._id.toString(),
+        content: newContent,
+        isEdited: true,
+        editedAt: message.editedAt,
+      });
+    }
+
+    return message;
+  }
+
+  async deleteMessage(messageId: string, senderId: string): Promise<Message> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException('Invalid messageId');
+    }
+
+    const message = await this.messageModel.findById(
+      new Types.ObjectId(messageId),
+    );
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const senderObjectId = new Types.ObjectId(senderId);
+    if (!message.senderId.equals(senderObjectId)) {
+      throw new ForbiddenException('You can only delete your own messages');
+    }
+
+    message.isDeleted = true;
+    message.text = 'This message has been deleted';
+    message.attachmentUrl = undefined;
+    message.attachmentType = undefined;
+    message.metadata = undefined;
+    await message.save();
+    await this.updateConversationLastMessageSnapshot(message);
+
+    // Emit update to conversation
+    if (this.chatGateway?.emitMessageUpdate) {
+      this.chatGateway.emitMessageUpdate(message.conversationId.toString(), {
+        id: message._id.toString(),
+        isDeleted: true,
+        attachmentUrl: null,
+        attachmentType: null,
+      });
+    }
+
+    return message;
+  }
+
+  private async updateConversationLastMessageSnapshot(message: Message) {
+    const conversation = await this.conversationModel.findById(
+      message.conversationId,
+    );
+    if (
+      !conversation ||
+      !conversation.lastMessage ||
+      !conversation.lastMessage.createdAt
+    ) {
+      return;
+    }
+
+    const conversationLastMessageTime = new Date(
+      conversation.lastMessage.createdAt,
+    ).getTime();
+    const messageTime = new Date(message.createdAt).getTime();
+
+    if (conversationLastMessageTime !== messageTime) {
+      return;
+    }
+
+    conversation.lastMessage.content = message.isDeleted
+      ? 'This message has been deleted'
+      : message.text;
+    conversation.lastMessage.isDeleted = message.isDeleted;
+    conversation.lastMessage.isEdited = message.isEdited;
+    conversation.lastMessage.attachmentUrl = message.isDeleted
+      ? undefined
+      : message.attachmentUrl;
+    conversation.lastMessage.attachmentType = message.isDeleted
+      ? undefined
+      : message.attachmentType;
+    conversation.lastMessage.metadata = message.isDeleted
+      ? undefined
+      : message.metadata;
+    if (!message.isDeleted && message.messageType) {
+      conversation.lastMessage.type = message.messageType;
+    }
+    conversation.markModified?.('lastMessage');
+    await conversation.save();
   }
 }

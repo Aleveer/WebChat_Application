@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
 import helmet from 'helmet';
 import compression from 'compression';
+import * as express from 'express';
+import { join } from 'path';
+import { AppModule } from './app.module';
 import { validateEnvironment } from './common/utils/env-validation.utils';
 
 async function bootstrap() {
@@ -122,6 +124,18 @@ async function bootstrap() {
         operationsSorter: 'alpha',
       },
     });
+
+    // Serve uploaded files statically (outside of /api prefix)
+    app.use(
+      '/files',
+      express.static(join(process.cwd(), 'uploads'), {
+        maxAge: '1d',
+        setHeaders: (res) => {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        },
+      }),
+    );
 
     // Set global prefix for API versioning
     app.setGlobalPrefix('api/v1', {

@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsObject,
+} from 'class-validator';
 
 enum MessageType {
     TEXT = 'text',
@@ -17,11 +23,23 @@ export class SendMessageDto {
     @IsString()
     receiverId: string;
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    content: string;
+    content?: string;
 
     @IsOptional()
     @IsEnum(MessageType)
     type?: string = 'text';
+
+    @IsOptional()
+    @IsString()
+    attachmentUrl?: string;
+
+    @IsOptional()
+    @IsString()
+    attachmentType?: string;
+
+    @IsOptional()
+    @IsObject()
+    metadata?: Record<string, any>;
 }
