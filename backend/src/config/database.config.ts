@@ -4,8 +4,6 @@ export const databaseConfig = () => ({
   database: {
     uri: getEnv('MONGODB_URI'),
     options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       maxPoolSize: getEnvNumber('DB_MAX_POOL_SIZE', 10),
       serverSelectionTimeoutMS: getEnvNumber(
         'DB_SERVER_SELECTION_TIMEOUT_MS',

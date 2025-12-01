@@ -9,7 +9,14 @@ import { File, FileDocument, FileType } from './schemas/file.schema';
 import { CreateFileDto, GetFilesDto } from './dto/file.dto';
 import { UsersService } from '../users/users.service';
 import { Metadata } from '../../common/types';
-import * as fs from 'fs';
+import { Readable } from 'stream';
+import { ConfigService } from '@nestjs/config';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -18,7 +25,18 @@ export class FilesService {
   constructor(
     @InjectModel(File.name) private fileModel: Model<FileDocument>,
     private usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private get s3() {
+    // Tận dụng AWS_REGION/AWS credentials có sẵn trong Lambda/container
+    if (!this._s3) {
+      this._s3 = new S3Client({});
+    }
+    return this._s3;
+  }
+
+  private _s3: S3Client | null = null;
 
   async uploadFile(
     file: Express.Multer.File,
@@ -29,19 +47,30 @@ export class FilesService {
       throw new BadRequestException('No file provided');
     }
 
-    // Generate unique filename
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${uuidv4()}${fileExtension}`;
-    const uploadPath = path.join(process.cwd(), 'uploads', fileName);
+    const bucketName =
+      this.configService.get<string>('UPLOADS_BUCKET_NAME') ||
+      process.env.UPLOADS_BUCKET_NAME;
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!bucketName) {
+      throw new BadRequestException(
+        'File storage is not configured (UPLOADS_BUCKET_NAME is missing)',
+      );
     }
 
-    // Save file to disk
-    fs.writeFileSync(uploadPath, file.buffer);
+    // Generate unique filename (S3 object key)
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${uuidv4()}${fileExtension}`;
+    const s3Key = `uploads/${fileName}`;
+
+    // Upload file buffer trực tiếp lên S3
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: s3Key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
 
     // Determine file type
     const fileType = this.getFileType(file.mimetype);
@@ -50,7 +79,9 @@ export class FilesService {
     const fileData: CreateFileDto = {
       original_name: file.originalname,
       file_name: fileName,
-      file_path: uploadPath,
+      // Lưu S3 key thay vì đường dẫn local
+      file_path: s3Key,
+      // Giữ endpoint download qua API backend, để client không phải đổi
       file_url: `/files/${fileName}`,
       file_size: file.size,
       mime_type: file.mimetype,
@@ -112,18 +143,25 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
-    // Delete physical file with error handling
-    if (fs.existsSync(file.file_path)) {
+    const bucketName =
+      this.configService.get<string>('UPLOADS_BUCKET_NAME') ||
+      process.env.UPLOADS_BUCKET_NAME;
+
+    if (bucketName) {
       try {
-        fs.unlinkSync(file.file_path);
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: file.file_path,
+          }),
+        );
       } catch (error) {
-        // Log error but continue with database deletion
+        // Nếu xóa trên S3 lỗi, vẫn tiếp tục xóa record DB
+        // Có thể log thêm bằng logger nếu cần
         console.error(
-          `Failed to delete physical file: ${file.file_path}`,
+          `Failed to delete S3 object: ${bucketName}/${file.file_path}`,
           error,
         );
-        // Note: You may want to use a proper logger here
-        // this.logger.error(`Failed to delete physical file: ${file.file_path}`, error);
       }
     }
 
@@ -131,16 +169,29 @@ export class FilesService {
     await this.fileModel.deleteOne({ _id: id });
   }
 
-  async getFileStream(
-    id: string,
-  ): Promise<{ stream: fs.ReadStream; file: File }> {
+  async getFileStream(id: string): Promise<{ stream: Readable; file: File }> {
     const file = await this.findOne(id);
 
-    if (!fs.existsSync(file.file_path)) {
-      throw new NotFoundException('File not found on disk');
+    const bucketName =
+      this.configService.get<string>('UPLOADS_BUCKET_NAME') ||
+      process.env.UPLOADS_BUCKET_NAME;
+
+    if (!bucketName) {
+      throw new NotFoundException('File storage is not configured');
     }
 
-    const stream = fs.createReadStream(file.file_path);
+    const response = await this.s3.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: file.file_path,
+      }),
+    );
+
+    if (!response.Body || !(response.Body instanceof Readable)) {
+      throw new NotFoundException('File not found in storage');
+    }
+
+    const stream = response.Body as Readable;
     return { stream, file };
   }
 

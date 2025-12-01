@@ -91,8 +91,3 @@ UserSchema.pre('save', async function (next) {
   this.password = await hash(this.password, saltRounds);
   next();
 });
-
-// Indexes for faster queries
-UserSchema.index({ phone: 1 });
-UserSchema.index({ username: 1 }, { sparse: true });
-UserSchema.index({ email: 1 }, { sparse: true });

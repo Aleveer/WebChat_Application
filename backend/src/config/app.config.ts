@@ -28,7 +28,6 @@ export const appConfig = () => ({
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       ],
-      uploadPath: getEnv('UPLOAD_PATH', './uploads'),
     },
     email: {
       host: getEnv('EMAIL_HOST', 'smtp.gmail.com'),
