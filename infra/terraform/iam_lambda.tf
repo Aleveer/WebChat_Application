@@ -97,7 +97,6 @@ resource "aws_lambda_function" "backend" {
       PORT        = "3000" # NestJS thường không dùng trong Lambda, nhưng giữ để tương thích.
       MONGODB_URI = var.mongodb_uri
 
-      # Database: app sẽ dùng multi-table, nên truyền tên từng bảng để code backend sử dụng.
       DYNAMODB_USERS_TABLE            = aws_dynamodb_table.users.name
       DYNAMODB_CONVERSATIONS_TABLE    = aws_dynamodb_table.conversations.name
       DYNAMODB_MESSAGES_TABLE         = aws_dynamodb_table.messages.name
@@ -121,7 +120,7 @@ resource "aws_lambda_function" "backend" {
       EMAIL_PASS   = var.email_pass
       EMAIL_USER   = var.email_user
 
-      # # Cognito (dùng khi bạn chuyển sang verify token từ Cognito)
+      # Cognito (dùng khi bạn chuyển sang verify token từ Cognito)
       # COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
       # COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.main.id
       # COGNITO_REGION       = var.aws_region

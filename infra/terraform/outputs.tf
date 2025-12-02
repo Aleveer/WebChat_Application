@@ -1,7 +1,3 @@
-#######################################
-## Outputs
-#######################################
-
 output "uploads_bucket_name" {
   value       = aws_s3_bucket.uploads.bucket
   description = "Tên S3 bucket dùng để lưu uploads."
