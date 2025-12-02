@@ -70,6 +70,13 @@ variable "mongodb_uri" {
   type        = string
 }
 
+# Danh sách email nhận cảnh báo AWS Budgets (vượt ngưỡng chi phí)
+variable "budget_alert_emails" {
+  description = "Danh sách email sẽ nhận alert khi chi phí AWS vượt ngưỡng budget."
+  type        = list(string)
+  default     = ["nguyenngocthanhdai2003@gmail.com"]
+}
+
 #mail smtp:
 variable "email_host" {
   description = "Host của SMTP server."
