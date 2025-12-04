@@ -19,6 +19,8 @@ email_secure = false
 email_user   = "danhanh.nguyen1643@gmail.com"
 email_pass   = "mqjr ksei iufy ljcr"
 
+vpc_id            = "vpc-0884feea924c9d743"
+public_subnet_ids = ["subnet-0f141404cd363158a", "subnet-0bf905edd9f0cf212"]
 
 ############################
 # Cognito Hosted UI (tạm để dev/local)

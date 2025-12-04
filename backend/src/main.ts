@@ -105,7 +105,6 @@ async function bootstrap() {
         'JWT-auth',
       )
       .addServer('http://localhost:3000', 'Development server')
-      //.addServer('https://api.yourdomain.com', 'Production server')
       .addTag('Health', 'Health check endpoints')
       .addTag('Auth', 'Authentication endpoints')
       .addTag('Users', 'User management endpoints')
@@ -138,8 +137,8 @@ async function bootstrap() {
     );
 
     // Set global prefix for API versioning
-    app.setGlobalPrefix('api/v1', {
-      exclude: ['/', '/ping', '/api/docs'],
+    app.setGlobalPrefix('api', {
+      exclude: ['/', '/api/docs'],
     });
 
     // Security headers

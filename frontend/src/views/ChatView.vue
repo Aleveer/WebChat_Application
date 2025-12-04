@@ -69,9 +69,9 @@ interface GroupDetails {
   conversation_id?: string | { _id: string };
 }
 
-// Đồng bộ với logic trong `useSocket.ts` để URL file/ảnh luôn trỏ đúng API backend
+// URL backend cố định (ALB) để load file/ảnh
 const API_BASE_URL =
-  'https://ds7bs8n0h6.execute-api.ap-southeast-2.amazonaws.com/api/v1';
+  'http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com/api';
 
 const resolveFileUrl = (url?: string | null) => {
   if (!url) return undefined;

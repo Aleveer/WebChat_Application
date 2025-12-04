@@ -2,9 +2,12 @@ import { ref, onUnmounted } from "vue";
 import { io, Socket } from "socket.io-client";
 import type { Message } from "../types/message";
 
+// URL cố định trỏ về ALB backend (không dùng .env)
 const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_BASE_URL?.replace?.(/\/$/, "")) ||
-  "http://localhost:3000";
+  "http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com/api";
+
+const SOCKET_URL =
+  "http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com";
 
 const resolveFileUrl = (url?: string | null) => {
   if (!url) return undefined;
@@ -16,10 +19,11 @@ export function useSocket() {
   // Include JWT in the socket handshake auth so the server can authenticate the socket
   const token =
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const socket: Socket = io("http://localhost:3000", {
+  const socket: Socket = io(SOCKET_URL, {
     auth: {
       token,
     },
+    path: "/socket.io",
   });
   const messages = ref<Message[]>([]);
   const isConnected = ref(false);
@@ -46,9 +50,7 @@ export function useSocket() {
       "direct";
     const normalized: Message = {
       ...(message as Message),
-      timestamp: message.timestamp
-        ? new Date(message.timestamp)
-        : new Date(),
+      timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
       attachmentUrl: resolveFileUrl(
         message.attachmentUrl || message.attachment_url || null
       ),

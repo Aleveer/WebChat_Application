@@ -26,6 +26,8 @@ import { GlobalExceptionFilter } from './common/filters/global.exception.filters
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 // Controllers
 import { MetricsController } from './common/controllers/metrics.controller';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 // Configuration
 import { databaseConfig } from './config/database.config';
@@ -114,7 +116,7 @@ import { appConfig } from './config/app.config';
     AnalyticsModule,
     ChatModule,
   ],
-  controllers: [MetricsController],
+  controllers: [AppController, MetricsController],
   providers: [
     // Global Guards
     {
@@ -142,6 +144,7 @@ import { appConfig } from './config/app.config';
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
+    AppService,
   ],
 })
 export class AppModule {}

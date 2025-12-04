@@ -16,7 +16,7 @@ variable "uploads_bucket_name" {
 }
 
 variable "backend_image_tag" {
-  description = "Tag của Docker image backend trên ECR (ví dụ: latest, dev, v1)."
+  description = "Tag của Docker image backend trên ECR."
   type        = string
   default     = "latest"
 }
@@ -102,4 +102,14 @@ variable "email_pass" {
   description = "Mật khẩu email."
   type        = string
   sensitive   = true
+}
+
+variable "vpc_id" {
+  description = "VPC ID dùng cho ALB (Application Load Balancer) + ECS (Elastic Container Service)"
+  type        = string
+}
+
+variable "public_subnet_ids" {
+  description = "Danh sách public subnet ID cho ALB (Application Load Balancer) và ECS (Fargate)"
+  type        = list(string)
 }
