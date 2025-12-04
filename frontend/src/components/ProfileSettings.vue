@@ -122,7 +122,7 @@ const fetchUserProfile = async () => {
 
   try {
     const token = localStorage.getItem('access_token');
-    const response = await fetch('http://localhost:3000/api/v1/users/me/profile', {
+    const response = await fetch('/api/users/me/profile', {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -194,7 +194,7 @@ const updateProfile = async () => {
       return;
     }
 
-    const response = await fetch('http://localhost:3000/api/v1/users/me/profile', {
+    const response = await fetch('/api/users/me/profile', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ const changePassword = async () => {
       newPassword: String(passwordForm.value.newPassword || '').trim(),
     };
     
-    const response = await fetch('http://localhost:3000/api/v1/users/change-password', {
+    const response = await fetch('/api/users/change-password', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

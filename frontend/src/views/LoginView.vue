@@ -19,11 +19,7 @@ const handleLogin = async () => {
   isLoading.value = true;
 
   try {
-    const trimmedUsername = username.value.trim();
-    
-
-    // TODO: Replace with actual API call
-    const response = await fetch('http://localhost:3000/api/v1/auth/login', {
+      const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

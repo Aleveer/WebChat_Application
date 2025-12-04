@@ -217,7 +217,7 @@ const searchUsers = async () => {
     }
 
     const response = await fetch(
-      `http://localhost:3000/api/v1/users/search?q=${encodeURIComponent(searchQuery.value)}`,
+      `/api/users/search?q=${encodeURIComponent(searchQuery.value)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

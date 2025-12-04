@@ -69,14 +69,25 @@ interface GroupDetails {
   conversation_id?: string | { _id: string };
 }
 
+// Đồng bộ với logic trong `useSocket.ts` để URL file/ảnh luôn trỏ đúng API backend
 const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_BASE_URL?.replace?.(/\/$/, '')) ||
-  'http://localhost:3000';
+  'https://ds7bs8n0h6.execute-api.ap-southeast-2.amazonaws.com/api/v1';
 
 const resolveFileUrl = (url?: string | null) => {
   if (!url) return undefined;
-  if (url.startsWith('http')) return url;
-  return `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('data:')
+  ) {
+    return trimmed;
+  }
+
+  return `${API_BASE_URL}${
+    trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  }`.replace(/([^:]\/)\/+/g, '$1');
 };
 
 const getAttachmentFileName = (msg: Message) => {
@@ -251,7 +262,7 @@ const fetchConversations = async () => {
   isLoadingConversations.value = true;
   try {
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/chat/conversations?userId=${currentUserId.value}&limit=50`,
+      `/api/chat/conversations?userId=${currentUserId.value}&limit=50`,
     );
     if (response.ok) {
       const payload = await response.json();
@@ -275,7 +286,7 @@ const fetchGroupDetails = async (groupId?: string) => {
   isLoadingGroup.value = true;
   try {
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/groups/${groupId}`,
+      `/api/groups/${groupId}`,
     );
     if (response.ok) {
       const payload = await response.json();
@@ -295,7 +306,7 @@ const loadMessagesFromAPI = async (
 ) => {
   try {
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/chat/messages/${conversationId}?limit=100`,
+      `/api/chat/messages/${conversationId}?limit=100`,
     );
     if (!response.ok) {
       throw new Error('Failed to fetch messages');
@@ -481,7 +492,7 @@ const sendMessagePayload = async ({
   let response: Response;
   if (selectedConversation.value.id) {
     response = await authorizedFetch(
-      'http://localhost:3000/api/v1/chat/message',
+      '/api/chat/message',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -495,7 +506,7 @@ const sendMessagePayload = async ({
     selectedConversation.value.userId
   ) {
     response = await authorizedFetch(
-      'http://localhost:3000/api/v1/chat/message-new',
+      '/api/chat/message-new',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -695,16 +706,13 @@ const uploadAttachment = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/files/upload`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
+  const response = await fetch('/api/files/upload', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
-  );
+    body: formData,
+  });
 
   if (!response.ok) {
     const message = await response.text();
@@ -972,7 +980,7 @@ const handleCreateGroup = async (payload: {
     );
 
     const response = await authorizedFetch(
-      'http://localhost:3000/api/v1/groups',
+      '/api/groups',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -1057,7 +1065,7 @@ const performGroupAction = async (
 const handleKickMember = async (userId: string) => {
   if (!selectedConversation.value?.groupId) return;
   await performGroupAction(
-    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}/members`,
+    `/api/groups/${selectedConversation.value.groupId}/members`,
     'DELETE',
     { user_id: userId },
   );
@@ -1069,7 +1077,7 @@ const handleToggleAdmin = async (payload: {
 }) => {
   if (!selectedConversation.value?.groupId) return;
   await performGroupAction(
-    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}/admin`,
+    `/api/groups/${selectedConversation.value.groupId}/admin`,
     'PATCH',
     {
       user_id: payload.userId,
@@ -1081,7 +1089,7 @@ const handleToggleAdmin = async (payload: {
 const handleRenameGroup = async (newName: string) => {
   if (!selectedConversation.value?.groupId || !newName.trim()) return;
   await performGroupAction(
-    `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}`,
+    `/api/groups/${selectedConversation.value.groupId}`,
     'PATCH',
     { name: newName.trim() },
   );
@@ -1114,7 +1122,7 @@ const saveEdit = async () => {
 
   try {
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/chat/message/${editingMessageId.value}/edit`,
+      `/api/chat/message/${editingMessageId.value}/edit`,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -1151,7 +1159,7 @@ const handleDeleteMessage = async (messageId: string) => {
 
   try {
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/chat/message/${messageId}/delete`,
+      `/api/chat/message/${messageId}/delete`,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -1198,7 +1206,7 @@ const handleDeleteGroup = async () => {
   try {
     groupActionLoading.value = true;
     const response = await authorizedFetch(
-      `http://localhost:3000/api/v1/groups/${selectedConversation.value.groupId}`,
+      `/api/groups/${selectedConversation.value.groupId}`,
       { method: 'DELETE' },
     );
     if (!response.ok) {

@@ -46,7 +46,7 @@ const authorizedFetch = async (input: RequestInfo, init: RequestInit = {}) => {
 const fetchUsers = async () => {
   loading.value = true;
   try {
-    const response = await authorizedFetch('http://localhost:3000/api/v1/users');
+    const response = await authorizedFetch('/api/users');
     const payload = await response.json();
     const data = payload?.data ?? payload;
     users.value = Array.isArray(data) ? data : [];
