@@ -1,7 +1,3 @@
-/**
- * Common Module Configuration Options
- * Allows consumers to customize which features they want to enable
- */
 export interface CommonModuleOptions {
   enableGlobalInterceptors?: boolean;
 

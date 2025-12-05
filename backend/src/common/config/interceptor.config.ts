@@ -1,7 +1,3 @@
-/**
- * Interceptor Configuration
- * Centralized configuration for all interceptors
- */
 export interface InterceptorConfig {
   timeout: {
     default: number;
