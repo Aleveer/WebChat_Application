@@ -4,10 +4,10 @@ import type { Message } from "../types/message";
 
 // URL cố định trỏ về ALB backend (không dùng .env)
 const API_BASE_URL =
-  "http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com/api";
+  "https://api.webchat.mom/api";
 
 const SOCKET_URL =
-  "http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com";
+  "https://api.webchat.mom";
 
 const resolveFileUrl = (url?: string | null) => {
   if (!url) return undefined;

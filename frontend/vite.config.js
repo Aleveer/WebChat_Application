@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const DEFAULT_API_BASE = 'http://webchat-app-dev-alb-783296763.ap-southeast-2.elb.amazonaws.com/api'
+const DEFAULT_API_BASE = 'https://api.webchat.mom/api'
 
 export default defineConfig({
   plugins: [vue()],
