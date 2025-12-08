@@ -152,10 +152,18 @@ export class UsersService {
       throw new BadRequestException('Invalid user ID format');
     }
 
+    // IMPORTANT: Remove password from update DTO to prevent accidental password updates
+    // Password should only be changed through the dedicated change-password endpoint
+    const { password, ...safeUpdateDto } = updateUserDto;
+    
+    if (password !== undefined) {
+      console.warn('Attempted to update password through profile update endpoint. Ignoring password field.');
+    }
+
     // Check if updating username and it already exists
-    if (updateUserDto.username) {
+    if (safeUpdateDto.username) {
       const existingUser = await this.userModel.findOne({
-        username: updateUserDto.username,
+        username: safeUpdateDto.username,
         _id: { $ne: sanitizedId },
       });
       if (existingUser) {
@@ -164,9 +172,9 @@ export class UsersService {
     }
 
     // Check if updating email and it already exists
-    if (updateUserDto.email) {
+    if (safeUpdateDto.email) {
       const existingEmail = await this.userModel.findOne({
-        email: updateUserDto.email,
+        email: safeUpdateDto.email,
         _id: { $ne: sanitizedId },
       });
       if (existingEmail) {
@@ -175,9 +183,9 @@ export class UsersService {
     }
 
     // Check if updating phone and it already exists
-    if (updateUserDto.phone) {
+    if (safeUpdateDto.phone) {
       const existingPhone = await this.userModel.findOne({
-        phone: updateUserDto.phone,
+        phone: safeUpdateDto.phone,
         _id: { $ne: sanitizedId },
       });
       if (existingPhone) {
@@ -193,12 +201,12 @@ export class UsersService {
 
     // Validate that at least one of email or phone will remain after update
     const updatedEmail =
-      updateUserDto.email !== undefined
-        ? updateUserDto.email
+      safeUpdateDto.email !== undefined
+        ? safeUpdateDto.email
         : currentUser.email;
     const updatedPhone =
-      updateUserDto.phone !== undefined
-        ? updateUserDto.phone
+      safeUpdateDto.phone !== undefined
+        ? safeUpdateDto.phone
         : currentUser.phone;
 
     if (!updatedEmail && !updatedPhone) {
@@ -212,8 +220,8 @@ export class UsersService {
     const unsetFields: any = {};
 
     // Separate fields to set vs unset
-    Object.keys(updateUserDto).forEach((key) => {
-      const value = updateUserDto[key];
+    Object.keys(safeUpdateDto).forEach((key) => {
+      const value = safeUpdateDto[key];
       if (value === undefined || value === null) {
         unsetFields[key] = ''; // MongoDB $unset syntax
       } else {
@@ -246,7 +254,7 @@ export class UsersService {
     await this.analyticsService.trackEvent({
       event_type: EventType.PROFILE_UPDATED,
       user_id: sanitizedId,
-      metadata: { updated_fields: Object.keys(updateUserDto) },
+      metadata: { updated_fields: Object.keys(safeUpdateDto) },
     });
 
     return user;

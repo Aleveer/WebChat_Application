@@ -42,31 +42,6 @@ data "aws_iam_policy_document" "lambda_app" {
 
     resources = ["${aws_s3_bucket.uploads.arn}/*"]
   }
-
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:DeleteItem",
-      "dynamodb:Query",
-      "dynamodb:Scan",
-      "dynamodb:BatchWriteItem",
-      "dynamodb:BatchGetItem",
-    ]
-
-    resources = [
-      aws_dynamodb_table.users.arn,
-      aws_dynamodb_table.conversations.arn,
-      aws_dynamodb_table.messages.arn,
-      aws_dynamodb_table.groups.arn,
-      aws_dynamodb_table.files.arn,
-      aws_dynamodb_table.notifications.arn,
-      aws_dynamodb_table.analytics_events.arn,
-    ]
-  }
 }
 
 resource "aws_iam_policy" "lambda_app" {

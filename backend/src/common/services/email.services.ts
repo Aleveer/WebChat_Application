@@ -163,7 +163,7 @@ export class EmailService {
     resetToken: string,
   ): Promise<boolean> {
     const subject = 'Password Reset Request - WebChat';
-    const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+    const resetUrl = `https://webchat.mom/reset-password?token=${resetToken}`;
     const content = `
       <!DOCTYPE html>
       <html>
