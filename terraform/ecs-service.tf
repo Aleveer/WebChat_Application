@@ -1,9 +1,8 @@
 resource "aws_security_group" "ecs_service_sg" {
   name        = "${var.project_name}-ecs-sg"
   description = "ECS service security group"
-  vpc_id      = var.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
-  # Chỉ cho phép ALB gọi vào port 3000
   ingress {
     from_port       = 3000
     to_port         = 3000
@@ -122,7 +121,7 @@ resource "aws_ecs_service" "backend" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.public_subnet_ids
+    subnets          = module.vpc.public_subnets
     security_groups  = [aws_security_group.ecs_service_sg.id]
     assign_public_ip = true
   }
